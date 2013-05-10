@@ -101,6 +101,11 @@ typedef uint8_t  UTF_8;
 #	define FB_WEOF WEOF
 #endif
 
+#ifdef HOST_ANDROID
+	/* Missing (FIXME!) */
+#	define wcstoull wcstoul
+#endif
+
 #ifndef FB_WSTR_FROM_INT
 #define FB_WSTR_FROM_INT( buffer, num ) \
     swprintf( buffer, sizeof( int ) * 3 + 1, _LC("%d"), (int) (num) )

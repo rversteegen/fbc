@@ -2,7 +2,9 @@
 
 #include "../fb.h"
 #include "fb_private_console.h"
+#ifndef HOST_ANDROID
 #include <termcap.h>
+#endif
 
 /*#define DEBUG_TGETSTR*/
 #ifdef DEBUG_TGETSTR
@@ -98,6 +100,7 @@ static void add_key(NODE **node, char *key, short code)
 
 static void init_keys()
 {
+#ifndef HOST_ANDROID
 	KEY_DATA *data;
 	char *key;
 
@@ -139,6 +142,7 @@ static void init_keys()
 		}
 	}
 	add_key(&root_node, "[M", KEY_MOUSE);
+#endif
 }
 
 static int get_input()

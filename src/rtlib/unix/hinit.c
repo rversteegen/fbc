@@ -7,7 +7,9 @@
 #include "fb_private_console.h"
 #include "../fb_private_thread.h"
 #include <signal.h>
+#ifndef HOST_ANDROID
 #include <termcap.h>
+#endif
 #ifdef HOST_LINUX
 #include <sys/io.h>
 #endif
@@ -155,12 +157,18 @@ int fb_hTermOut( int code, int param1, int param2 )
 			break;
 		}
 	} else {
+#ifdef HOST_ANDROID
+		// FIXME: check this
+		if( fputc( code, stdout ) == EOF )
+			return FALSE;
+#else	    
 		if (!__fb_con.seq[code])
 			return FALSE;
 		str = tgoto(__fb_con.seq[code], param1, param2);
 		if (!str)
 			return FALSE;
 		tputs(str, 1, putchar);
+#endif
 	}
 
 	fflush( stdout );
@@ -323,6 +331,7 @@ static void hInit( void )
 
 	memset(&__fb_con, 0, sizeof(__fb_con));
 
+#ifndef HOST_ANDROID
 	/* Init termcap */
 	term = getenv("TERM");
 	if ((!term) || (tgetent(buffer, term) <= 0))
@@ -337,6 +346,7 @@ static void hInit( void )
 		return;
 	for (i = 0; i < SEQ_MAX; i++)
 		__fb_con.seq[i] = tgetstr(seq[i], NULL);
+#endif
 
 	/* !!!TODO!!! detect other OS consoles? (freebsd: 'cons25', etc?) */
 	if ((!strcmp(term, "console")) || (!strncmp(term, "linux", 5)))

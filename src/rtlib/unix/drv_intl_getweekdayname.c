@@ -1,13 +1,18 @@
 /* get localized weekday name */
 
 #include "../fb.h"
+#ifndef HOST_ANDROID
 #include <langinfo.h>
+#endif
 
 FBSTRING *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
 {
     const char *pszName;
     FBSTRING *result;
     size_t name_len;
+#ifdef HOST_ANDROID
+    pszName = "<day>";  //FIXME
+#else
     nl_item index;
 
     if( weekday < 1 || weekday > 7 )
@@ -22,6 +27,7 @@ FBSTRING *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
     FB_LOCK();
 
     pszName = nl_langinfo( index );
+#endif
     if( pszName==NULL ) {
         FB_UNLOCK();
         return NULL;

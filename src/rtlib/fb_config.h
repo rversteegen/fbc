@@ -17,6 +17,10 @@
 	#define HOST_CYGWIN
 	#define HOST_WIN32
 	#define WIN32_LEAN_AND_MEAN
+#elif defined __ANDROID__
+	#define HOST_ANDROID
+	#define HOST_UNIX
+	/* Omit HOST_LINUX; Android isn't GNU/Linux. */
 #elif defined __linux__
 	#define HOST_LINUX
 	#define HOST_UNIX

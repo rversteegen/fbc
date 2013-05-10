@@ -1,7 +1,9 @@
 /* get localized short DATE format */
 
 #include "../fb.h"
+#ifndef HOST_ANDROID
 #include <langinfo.h>
+#endif
 
 int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
 {
@@ -10,7 +12,11 @@ int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
     char achAddBuffer[2] = { 0 };
     const char *pszAdd = NULL;
     size_t remaining = len - 1, add_len = 0;
+#ifdef HOST_ANDROID
+    const char *pszCurrent = "%d/%m/%y";
+#else
     const char *pszCurrent = nl_langinfo( D_FMT );
+#endif
 
     DBG_ASSERT(buffer!=NULL);
 
