@@ -749,7 +749,7 @@ function rtlInitApp _
 		'' TODO: x86 assumption
 		'if( fbIsX86( ) ) then
 			'' Check CPU type
-			rtlCpuCheck( )
+			'rtlCpuCheck( )    'FIXME
 		'end if
 	end if
 
