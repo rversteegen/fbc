@@ -998,51 +998,32 @@ private sub hWriteFTOI _
 		byval ptype as integer _
 	)
 
-	dim as string rtype_str, rtype_suffix
+	dim as string rtype_str, rtype_prefix
 	select case rtype
 	case FB_DATATYPE_INTEGER
-		rtype_str = "integer"
-		rtype_suffix = "l"
+		rtype_str = "long int"
+		rtype_prefix = "l"
 
 	case FB_DATATYPE_LONGINT
-		rtype_str = "longint"
-		rtype_suffix = "q"
+		rtype_str = "long long int"
+		rtype_prefix = "ll"
 	end select
 
 	dim as string ptype_str, ptype_suffix
 	select case ptype
 	case FB_DATATYPE_SINGLE
 		ptype_str = "single"
-		ptype_suffix = "s"
+		ptype_suffix = "f"
 
 	case FB_DATATYPE_DOUBLE
 		ptype_str = "double"
-		ptype_suffix = "l"
+		ptype_suffix = ""
 	end select
 
-	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
-		rtype_suffix = ""
-		ptype_suffix = ""
-	end if
-
-	'' TODO: x86 specific
-	hWriteLine( "", TRUE )
-	hWriteLine( "static inline " + rtype_str + " fb_" + fname +  "( " + ptype_str + " value )", TRUE )
-	hWriteLine( "{", TRUE )
-	sectionIndent( )
-		hWriteLine( "volatile " + rtype_str + " result;", TRUE )
-		hWriteLine( "__asm__(", TRUE )
-		sectionIndent( )
-			hWriteLine( """fld" + ptype_suffix + " %1;"""  , TRUE )
-			hWriteLine( """fistp" + rtype_suffix + " %0;""", TRUE )
-			hWriteLine( ":""=m"" (result)", TRUE )
-			hWriteLine( ":""m"" (value)"  , TRUE )
-		sectionUnindent( )
-		hWriteLine( ");", TRUE )
-		hWriteLine( "return result;", TRUE )
-	sectionUnindent( )
-	hWriteLine( "}", TRUE )
-
+	dim cfunc as string
+	cfunc = rtype_prefix & "rint" & ptype_suffix
+	hWriteLine( rtype_str & " " & cfunc & "(" & ptype_str & " value);" )
+	hWriteLine( "#define fb_" & fname & " " & cfunc )
 end sub
 
 private sub hEmitFTOIBuiltins( )

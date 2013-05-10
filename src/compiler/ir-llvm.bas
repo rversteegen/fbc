@@ -814,40 +814,32 @@ private sub hWriteFTOI _
 		byval ptype as integer _
 	)
 
-	dim as string rtype_str, rtype_suffix
+	dim as string rtype_str, rtype_prefix
 	select case rtype
 	case FB_DATATYPE_INTEGER
-		rtype_str = "integer"
-		rtype_suffix = "l"
+		rtype_str = "long int"
+		rtype_prefix = "l"
 
 	case FB_DATATYPE_LONGINT
-		rtype_str = "longint"
-		rtype_suffix = "q"
+		rtype_str = "long long int"
+		rtype_prefix = "ll"
 	end select
 
 	dim as string ptype_str, ptype_suffix
 	select case ptype
 	case FB_DATATYPE_SINGLE
 		ptype_str = "single"
-		ptype_suffix = "s"
+		ptype_suffix = "f"
 
 	case FB_DATATYPE_DOUBLE
 		ptype_str = "double"
-		ptype_suffix = "l"
+		ptype_suffix = ""
 	end select
 
-	'' TODO: x86 specific
-	hWriteLine( "static inline " & rtype_str & " fb_" & fname &  " ( " & ptype_str & !" value ) {\n" & _
-				!"\tvolatile " & rtype_str & !" result;\n" & _
-				!"\t__asm__ (\n" & _
-				!"\t\t\"fld" & ptype_suffix & !" %1;\"\n" & _
-				!"\t\t\"fistp" & rtype_suffix & !" %0;\"\n" & _
-				!"\t\t:\"=m\" (result)\n" & _
-				!"\t\t:\"m\" (value)\n" & _
-				!"\t);\n" & _
-				!"\treturn result;\n" & _
-				!"}" )
-
+	dim cfunc as string
+	cfunc = rtype_prefix & "rint" & ptype_suffix
+	hWriteLine( rtype_str & " " & cfunc & "(" & ptype_str & " value);" )
+	hWriteLine( "#define fb_" & fname & " " & cfunc )
 end sub
 
 private sub hEmitFTOIBuiltins( )
