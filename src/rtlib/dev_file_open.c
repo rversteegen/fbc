@@ -178,6 +178,9 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
     /* change the default buffer size */
     setvbuf( fp, NULL, _IOFBF, FB_FILE_BUFSIZE );
 
+    /* setvbuf may have changed the file position */
+    fseeko( fp, 0, SEEK_SET );
+
     handle->opaque = fp;
     if (handle->access == FB_FILE_ACCESS_ANY)
         handle->access = FB_FILE_ACCESS_READWRITE;
