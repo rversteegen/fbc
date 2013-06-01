@@ -2,6 +2,9 @@
 
 #include "fb.h"
 #include <locale.h>
+#ifdef HOST_ANDROID
+#include <android/log.h>
+#endif
 
 FB_RTLIB_CTX __fb_ctx /* not initialized */;
 static int __fb_is_inicnt = 0;
@@ -80,5 +83,11 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 /* called by FB program */
 FBCALL void fb_End( int errlevel )
 {
+#ifdef HOST_ANDROID
+	/* FIXME: Currently fb_hRtExit doesn't get called, so this is here instead of fb_hEnd */
+	__android_log_write(ANDROID_LOG_INFO, "FreeBASIC", "fb_End");
+	if( __fb_ctx.errmsg )
+		__android_log_write(ANDROID_LOG_ERROR, "FreeBASIC", __fb_ctx.errmsg);
+#endif
 	exit( errlevel );
 }
