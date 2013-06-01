@@ -104,6 +104,11 @@ typedef uint8_t  UTF_8;
 #ifdef HOST_ANDROID
 	/* Missing (FIXME!) */
 #	define wcstoull wcstoul
+#	define mbstowcs __android_mbstowcs
+	static __inline__ size_t __android_mbstowcs(FB_WCHAR *wcstr, const char *mbstr, size_t count)
+	{
+		return memcpy(wcstr,mbstr,count), count;
+	}
 #endif
 
 #ifndef FB_WSTR_FROM_INT
