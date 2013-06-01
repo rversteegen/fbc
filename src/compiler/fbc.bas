@@ -1203,6 +1203,8 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 			value = FB_CPUTYPE_PENTIUMSSE3
 		case "native"
 			value = FB_CPUTYPE_NATIVE
+		case "arm"
+			value = FB_CPUTYPE_ARM
 		case else
 			hFatalInvalidOption( arg )
 		end select
@@ -2354,7 +2356,7 @@ private function hCompileXpm( ) as integer
 	function = TRUE
 end function
 
-dim shared as const zstring ptr gcc_architectures(FB_CPUTYPE_386 to FB_CPUTYPE_NATIVE) = _
+dim shared as const zstring ptr gcc_architectures(FB_CPUTYPE_386 to FB_CPUTYPE_ARM) = _
 { _
 	@"i386", _
 	@"i486", _
@@ -2369,7 +2371,8 @@ dim shared as const zstring ptr gcc_architectures(FB_CPUTYPE_386 to FB_CPUTYPE_N
 	@"pentium3", _
 	@"pentium4", _
 	@"prescott", _
-	@"native" _
+	@"native", _
+        @"arm" _
 }
 
 private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as integer
@@ -2382,7 +2385,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 
 	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
 	case FB_BACKEND_GCC
-		ln += "-m32 "
+		if( fbGetOption( FB_COMPOPT_CPUTYPE ) <> FB_CPUTYPE_ARM ) then
+			ln += "-m32 "
+		end if
 
 		ln += "-S -nostdlib -nostdinc -Wall -Wno-unused-label " + _
 		      "-Wno-unused-function -Wno-unused-variable "
@@ -2417,7 +2422,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-g "
 		end if
 
-		ln += "-mtune=" + *gcc_architectures(fbGetOption( FB_COMPOPT_CPUTYPE )) + " "
+		if( fbGetOption( FB_COMPOPT_CPUTYPE ) <> FB_CPUTYPE_ARM ) then
+			ln += "-mtune=" + *gcc_architectures(fbGetOption( FB_COMPOPT_CPUTYPE )) + " "
+		end if
 
 		if( fbGetOption( FB_COMPOPT_FPUTYPE ) = FB_FPUTYPE_SSE ) then
 			ln += "-mfpmath=sse -msse2 "
@@ -2463,7 +2470,9 @@ end sub
 private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	dim as string ln
 
-	ln = "--32 "  '' we're 32bit only for now, this helps on 64bit systems
+	if( fbGetOption( FB_COMPOPT_CPUTYPE ) <> FB_CPUTYPE_ARM ) then
+		ln = "--32 "  '' we're 32bit only for now, this helps on 64bit systems
+	end if
 	if( fbGetOption( FB_COMPOPT_DEBUG ) = FALSE ) then
 		ln += "--strip-local-absolute "
 	end if
