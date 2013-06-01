@@ -7,7 +7,7 @@
 #include "fb_private_console.h"
 #include "../fb_private_thread.h"
 #include <signal.h>
-#ifndef HOST_ANDROID
+#ifndef DISABLE_NCURSES
 #include <termcap.h>
 #endif
 #ifdef HOST_LINUX
@@ -20,8 +20,10 @@ FBCONSOLE __fb_con;
 
 typedef void (*SIGHANDLER)(int);
 static SIGHANDLER old_sighandler[NSIG];
+#ifndef DISABLE_NCURSES
 static const char *seq[] = { "cm", "ho", "cs", "cl", "ce", "WS", "bl", "AF", "AB",
 							 "me", "md", "SF", "ve", "vi", "dc", "ks", "ke" };
+#endif
 
 static pthread_t __fb_bg_thread;
 static pthread_mutex_t __fb_bg_mutex;
@@ -90,7 +92,7 @@ static void console_resize(int sig)
 {
 	unsigned char *char_buffer, *attr_buffer;
 	struct winsize win;
-	int r, c, w, h;
+	int r, w, h;
 
 	if (!__fb_con.inited)
 		return;
@@ -99,6 +101,7 @@ static void console_resize(int sig)
 	ioctl( STDOUT_FILENO, TIOCGWINSZ, &win );
 	if (win.ws_row == 0xFFFF) {
 #ifdef HOST_LINUX
+		int c;
 		if( fb_hTermQuery( SEQ_QUERY_WINDOW, &r, &c ) ) {
 			win.ws_row = r;
 			win.ws_col = c;
@@ -140,7 +143,6 @@ int fb_hTermOut( int code, int param1, int param2 )
 {
 	const char *extra_seq[] = { "\e(U", "\e(B", "\e[6n", "\e[18t",
 		"\e[?1000h\e[?1003h", "\e[?1003l\e[?1000l", "\e[H\e[J\e[0m" };
-	char *str;
 
 	if (!__fb_con.inited)
 		return FALSE;
@@ -157,13 +159,14 @@ int fb_hTermOut( int code, int param1, int param2 )
 			break;
 		}
 	} else {
-#ifdef HOST_ANDROID
+#ifdef DISABLE_NCURSES
 		// FIXME: check this
 		if( fputc( code, stdout ) == EOF )
 			return FALSE;
 #else	    
 		if (!__fb_con.seq[code])
 			return FALSE;
+		char *str;
 		str = tgoto(__fb_con.seq[code], param1, param2);
 		if (!str)
 			return FALSE;
@@ -288,12 +291,15 @@ void fb_hExitConsole( void )
 static void hInit( void )
 {
 	const int sigs[] = { SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGTERM, SIGINT, SIGQUIT, -1 };
-	char buffer[2048], *p, *term;
+#ifndef DISABLE_NCURSES
+	char buffer[2048], *p;
 	struct termios tty;
-    int i;
+#endif
+	char *term;
+	int i;
 
 #ifdef ENABLE_MT
-    pthread_mutexattr_t attr;
+	pthread_mutexattr_t attr;
 #endif
 
 #if defined(__GNUC__) && defined(__i386__)
@@ -331,7 +337,11 @@ static void hInit( void )
 
 	memset(&__fb_con, 0, sizeof(__fb_con));
 
-#ifndef HOST_ANDROID
+#ifdef DISABLE_NCURSES
+	term = getenv("TERM");
+	if (!term)
+		term = "console";
+#else
 	/* Init termcap */
 	term = getenv("TERM");
 	if ((!term) || (tgetent(buffer, term) <= 0))

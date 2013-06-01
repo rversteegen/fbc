@@ -59,10 +59,11 @@
 #   -d ENABLE_PREFIX=/some/path   hard-code specific $(prefix) into fbc
 #
 # rtlib/gfxlib2 source code configuration (CFLAGS):
-#   -DDISABLE_X11    build without X11 headers (disables X11 gfx driver)
-#   -DDISABLE_GPM    build without gpm.h (disables Linux GetMouse)
-#   -DDISABLE_FFI    build without ffi.h (disables ThreadCall)
-#   -DDISABLE_OPENGL build without OpenGL headers (disables OpenGL gfx drivers)
+#   -DDISABLE_X11     build without X11 headers (disables X11 gfx driver)
+#   -DDISABLE_GPM     build without gpm.h (disables Linux GetMouse)
+#   -DDISABLE_FFI     build without ffi.h (disables ThreadCall)
+#   -DDISABLE_OPENGL  build without OpenGL headers (disables OpenGL gfx drivers)
+#   -DDISABLE_NCURSES build without ncurses (disables many console commands)
 #
 # makefile variables may either be set on the make command line,
 # or (in a more permanent way) inside a 'config.mk' file.
@@ -166,6 +167,9 @@ ifdef TARGET
     ifneq ($(filter xbox%,$(triplet_os)),)
       TARGET_OS := xbox
     endif
+    ifneq ($(filter android%,$(triplet_os)),)
+      TARGET_OS := android
+    endif
   endif
 
   ifndef TARGET_ARCH
@@ -184,6 +188,9 @@ ifdef TARGET
     endif
     ifeq ($(triplet_arch),powerpc64)
       TARGET_ARCH := powerpc64
+    endif
+    ifeq ($(triplet_arch),arm)
+      TARGET_ARCH := arm
     endif
   endif
 else
@@ -322,6 +329,10 @@ ifeq ($(TARGET_OS),xbox)
   DISABLE_MT := YesPlease
 endif
 
+ifeq ($(TARGET_OS),android)
+  ALLCFLAGS += -DDISABLE_FFI -DDISABLE_X11 -DDISABLE_NCURSES
+endif
+
 # If cross-compiling, use -target
 ifdef TARGET
   ALLFBCFLAGS += -target $(TARGET)
@@ -360,7 +371,7 @@ RTLIB_DIRS := $(srcdir)/rtlib $(srcdir)/rtlib/$(TARGET_OS) $(srcdir)/rtlib/$(TAR
 ifeq ($(TARGET_OS),cygwin)
   RTLIB_DIRS += $(srcdir)/rtlib/win32
 endif
-ifneq ($(filter darwin freebsd linux netbsd openbsd solaris,$(TARGET_OS)),)
+ifneq ($(filter android darwin freebsd linux netbsd openbsd solaris,$(TARGET_OS)),)
   RTLIB_DIRS += $(srcdir)/rtlib/unix
 endif
 
@@ -403,7 +414,7 @@ all: compiler rtlib gfxlib2
 src src/compiler src/rtlib src/gfxlib2 bin lib \
 $(newcompiler) $(newlibfb) $(newlibfbmt) $(newlibfbgfx) $(libdir) \
 $(prefix) $(prefix)/bin $(prefix)/inc $(prefix)/include $(prefix)/include/$(FB_NAME) $(prefix)/lib $(prefixlib):
-	mkdir $@
+	mkdir -p $@
 
 ################################################################################
 
