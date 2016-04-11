@@ -27,6 +27,10 @@
 #include once "crt/dos/stdio.bi"
 #elseif defined(__FB_LINUX__)
 #include once "crt/linux/stdio.bi"
+#elseif defined(__FB_DARWIN__)
+#include once "crt/darwin/stdio.bi"
+#else
+#error Unsupported platform
 #endif
 
 extern "c"

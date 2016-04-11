@@ -18,6 +18,11 @@
 #include once "crt/dos/time.bi"
 #elseif defined(__FB_LINUX__)
 #include once "crt/linux/time.bi"
+#elseif defined(__FB_DARWIN__)
+'' FIXME: may be wrong
+#include once "crt/linux/time.bi"
+#else
+#error Unsupported platform
 #endif
 
 extern "c"
