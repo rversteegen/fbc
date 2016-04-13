@@ -89,6 +89,7 @@ type FBCCTX
 
 	outname 			as zstring * FB_MAXPATHLEN+1
 	mainname			as zstring * FB_MAXPATHLEN+1
+	entry				as zstring * FB_MAXNAMELEN+1
 	mainset				as integer
 	mapfile				as zstring * FB_MAXPATHLEN+1
 	subsystem			as zstring * FB_MAXNAMELEN+1
@@ -1339,6 +1340,7 @@ enum
 	OPT_DLL
 	OPT_DYLIB
 	OPT_E
+	OPT_ENTRY
 	OPT_EX
 	OPT_EXX
 	OPT_EXPORT
@@ -1401,6 +1403,7 @@ dim shared as integer option_takes_argument(0 to (OPT__COUNT - 1)) = _
 	FALSE, _ '' OPT_DLL
 	FALSE, _ '' OPT_DYLIB
 	FALSE, _ '' OPT_E
+	TRUE,  _ '' OPT_ENTRY
 	FALSE, _ '' OPT_EX
 	FALSE, _ '' OPT_EXX
 	FALSE, _ '' OPT_EXPORT
@@ -1492,6 +1495,9 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 
 	case OPT_E
 		fbSetOption( FB_COMPOPT_ERRORCHECK, TRUE )
+
+	case OPT_ENTRY
+		fbc.entry = arg
 
 	case OPT_EX
 		fbSetOption( FB_COMPOPT_ERRORCHECK, TRUE )
@@ -1845,6 +1851,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 
 	case asc("e")
 		ONECHAR(OPT_E)
+		CHECK("entry", OPT_ENTRY)
 		CHECK("ex", OPT_EX)
 		CHECK("exx", OPT_EXX)
 		CHECK("export", OPT_EXPORT)
@@ -2510,7 +2517,7 @@ private sub hCompileBas _
 
 	do
 		'' init the parser
-		fbInit( is_main, restarts )
+		fbInit( is_main, restarts, fbc.entry )
 
 		if( is_fbctinf ) then
 			'' Let the compiler know about all libs collected so far,
@@ -3289,6 +3296,7 @@ private sub hPrintOptions( )
 	print "  -dll             Same as -dylib"
 	print "  -dylib           Create a DLL (win32) or shared library (*nix/*BSD)"
 	print "  -e               Enable runtime error checking"
+	print "  -entry           Change the entry point of the program from main()"
 	print "  -ex              -e plus RESUME support"
 	print "  -exx             -ex plus array bounds/null-pointer checking"
 	print "  -export          Export symbols for dynamic linkage"
