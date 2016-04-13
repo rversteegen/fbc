@@ -624,9 +624,8 @@ private sub hLoadFbctinfFromObj( )
 			hLoadFbctinfFromCOFF( &h014C )
 		end select
 
-	case FB_COMPTARGET_DARWIN, FB_COMPTARGET_FREEBSD, _
-	     FB_COMPTARGET_LINUX, FB_COMPTARGET_NETBSD, _
-	     FB_COMPTARGET_OPENBSD
+	case FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
+	     FB_COMPTARGET_NETBSD, FB_COMPTARGET_LINUX
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86_64
 			INFO( "reading x86-64 ELF: " + parser.filename )
@@ -635,6 +634,10 @@ private sub hLoadFbctinfFromObj( )
 			INFO( "reading i386 ELF: " + parser.filename )
 			hLoadFbctinfFromELF32_H( )
 		end select
+
+	case FB_COMPTARGET_DARWIN
+		INFO( "Mach-O not supported" )
+		exit sub
 
 	end select
 
