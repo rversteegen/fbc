@@ -2789,11 +2789,14 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-fPIC "
 		end if
 
-		'' Warning: -Wno-unused-but-set-variable is not supported by somewhat
-		'' old gcc, and will cause a failure. But we don't want all that spam.
-		ln += "-S -nostdlib -nostdinc -Wall -Wno-unused-label " + _
-		      "-Wno-unused-function -Wno-unused-variable " + _
-		      "-Wno-unused-but-set-variable "
+		ln += "-S -nostdlib -nostdinc -Wall "
+
+		'' -Wno-unused-but-set-variable and the warning it suppresses were introduced
+		'' in GCC 4.6. Don't pass that flag to avoid an error on earlier GCC. As a
+		'' result, to disable the warning on 4.6+ need to disable all unused warnings...
+		' ln += "-Wno-unused-label -Wno-unused-function -Wno-unused-variable "
+		' ln += "-Wno-unused-but-set-variable "
+		ln += "-Wno-unused "
 
 		'' Don't warn about non-standard main() signature
 		'' (we emit "ubyte **argv" instead of "char **argv")
