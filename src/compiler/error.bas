@@ -171,6 +171,7 @@ declare function hMakeParamDesc _
 		@"-asm att used for -gen gas, but -gen gas only supports -asm intel", _
 		@"-pic used when making executable (only works when making a shared library)", _
 		@"-pic used, but not supported by target system (only works for non-x86 Unixes)", _
+		@"Graphics routines were used, but the gfxlib has not been ported to this target", _
 		@"Var-len strings cannot be initialized", _
 		@"Recursive TYPE or UNION not allowed", _
 		@"Recursive DEFINE not allowed", _

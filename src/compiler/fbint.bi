@@ -553,7 +553,7 @@ enum FB_TARGETOPT
 	FB_TARGETOPT_RETURNINREGS        = &h00000010
 
 	'' Whether the stack needs to be aligned to 16 bytes before any
-	'' call to external code (x86/x86_64 GNU/Linux and Darwin)
+	'' call to external code (x86/x86_64 GNU/Linux, Android and Darwin)
 	FB_TARGETOPT_STACKALIGN16        = &h00000020
 
 	FB_TARGETOPT_ELF   = &h00000040
