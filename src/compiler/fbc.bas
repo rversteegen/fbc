@@ -1620,6 +1620,8 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 			value = FB_FPUTYPE_FPU
 		case "SSE"
 			value = FB_FPUTYPE_SSE
+		case "NEON"
+			value = FB_FPUTYPE_NEON
 		case else
 			hFatalInvalidOption( arg )
 		end select
@@ -2247,14 +2249,26 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 	''
 	'' Check for incompatible options etc.
 	''
-
-	if ( fbGetOption( FB_COMPOPT_FPUTYPE ) = FB_FPUTYPE_FPU ) then
+	select case( fbGetOption( FB_COMPOPT_FPUTYPE ) )
+	case FB_FPUTYPE_FPU
 		if( fbGetOption( FB_COMPOPT_VECTORIZE ) >= FB_VECTORIZE_NORMAL ) or _
-			( fbGetOption( FB_COMPOPT_FPMODE ) = FB_FPMODE_FAST ) then
-				errReportEx( FB_ERRMSG_OPTIONREQUIRESSSE, "", -1 )
+		    ( fbGetOption( FB_COMPOPT_FPMODE ) = FB_FPMODE_FAST ) then
+			errReportEx( FB_ERRMSG_OPTIONREQUIRESSSE, "", -1 )
 			fbcEnd( 1 )
 		end if
-	end if
+	case FB_FPUTYPE_SSE
+		if( (fbGetCpuFamily( ) <> FB_CPUFAMILY_X86) and _
+		    (fbGetCpuFamily( ) <> FB_CPUFAMILY_X86_64) ) then
+			errReportEx( FB_ERRMSG_SSEREQUIRESX86, "", -1 )
+			fbcEnd( 1 )
+		end if
+	case FB_FPUTYPE_NEON
+		if( (fbGetCpuFamily( ) <> FB_CPUFAMILY_ARM) and _
+		    (fbGetCpuFamily( ) <> FB_CPUFAMILY_AARCH64) ) then
+			errReportEx( FB_ERRMSG_NEONREQUIRESARM, "", -1 )
+			fbcEnd( 1 )
+		end if
+	end select
 
 	'' 1. The compiler (fb.bas) starts with default target settings for
 	''    native compilation.
@@ -2264,6 +2278,12 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 	'' 3. -arch overrides any other arch settings.
 	if( fbc.cputype >= 0 ) then
 		fbSetOption( FB_COMPOPT_CPUTYPE, fbc.cputype )
+	end if
+
+	'' NEON implies at least armv7-a
+	if( (fbGetOption( FB_COMPOPT_FPUTYPE ) = FB_FPUTYPE_NEON) and _
+	    (fbGetOption( FB_COMPOPT_CPUTYPE ) < FB_CPUTYPE_ARMV7A) ) then
+		fbSetOption( FB_COMPOPT_CPUTYPE, FB_CPUTYPE_ARMV7A )
 	end if
 
 	'' 4. Check for target/arch conflicts, e.g. dos and non-x86
@@ -2907,7 +2927,16 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		end if
 
 		if( fbGetOption( FB_COMPOPT_FPUTYPE ) = FB_FPUTYPE_SSE ) then
-			ln += "-mfpmath=sse -msse2 "
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID ) then
+				'' Guaranteed to be present
+				ln += "-mfpmath=sse -mssse3 "
+			else
+				ln += "-mfpmath=sse -msse2 "
+			end if
+		elseif( fbGetOption( FB_COMPOPT_FPUTYPE ) = FB_FPUTYPE_NEON ) then
+			'' NEON is not IEEE 754-compliant (except in armv8+), so
+			'' gcc will not use it without this.
+			ln += "-mfpu=neon -funsafe-math-optimizations "
 		end if
 
 		select case( fbGetCpuFamily( ) )
@@ -3395,7 +3424,7 @@ private sub hPrintOptions( )
 	print "  -export          Export symbols for dynamic linkage"
 	print "  -forcelang <name>  Override #lang statements in source code"
 	print "  -fpmode fast|precise  Select floating-point math accuracy/speed"
-	print "  -fpu x87|sse     Set target FPU"
+	print "  -fpu x87|sse|neon  Set target FPU"
 	print "  -g               Add debug info"
 	print "  -gen gas|gcc|llvm  Select code generation backend"
 	print "  [-]-help         Show this help output"

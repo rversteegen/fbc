@@ -370,6 +370,8 @@ declare function hMakeParamDesc _
 		@"Can't use ... as lower bound", _
 		@"FOR/NEXT variable name mismatch", _
 		@"Selected option requires an SSE FPU mode", _
+		@"-fpu sse option can only be used on x86 and x86_64 architectures", _
+		@"-fpu neon option can only be used on arm architectures", _
 		@"Expected relational operator ( =, >, <, <>, <=, >= )", _
 		@"Unsupported statement in -gen gcc mode", _
 		@"Too many labels", _
