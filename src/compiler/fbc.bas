@@ -1808,7 +1808,7 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 			'' for use as prefix for binutils/gcc tools, but only
 			'' when cross-compiling or if it's really a GNU triplet.
 			if( (os <> FB_DEFAULT_TARGET) or _
-			    (cputype <> FB_DEFAULT_CPUTYPE) or _
+			    (cputype <> FB_DEFAULT_CPUTYPE) or _    '''FIXME
 			    is_gnu_triplet ) then
 				fbc.target = arg
 				fbc.targetprefix = fbc.target + "-"
