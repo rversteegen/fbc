@@ -93,14 +93,15 @@
 #   -d ENABLE_LIB64          use prefix/lib64/ instead of prefix/lib/ for 64bit libs (non-standalone only)
 #
 # rtlib/gfxlib2 source code configuration (CFLAGS):
-#   -DDISABLE_X11    build without X11 headers (disables X11 gfx driver)
-#   -DDISABLE_GPM    build without gpm.h (disables Linux GetMouse)
-#   -DDISABLE_FFI    build without ffi.h (disables ThreadCall)
-#   -DDISABLE_OPENGL build without OpenGL headers (disables OpenGL gfx drivers)
-#   -DDISABLE_FBDEV  build without Linux framebuffer device headers (disables Linux fbdev gfx driver)
-#   -DDISABLE_NCURSES build without libtinfo or ncurses (disables console commands)
+#   -DDISABLE_X11      build without X11 headers (disables X11 gfx driver)
+#   -DDISABLE_GPM      build without gpm.h (disables Linux GetMouse)
+#   -DDISABLE_FFI      build without ffi.h (disables ThreadCall)
+#   -DDISABLE_OPENGL   build without OpenGL headers (disables OpenGL gfx drivers)
+#   -DDISABLE_FBDEV    build without Linux framebuffer device headers (disables Linux fbdev gfx driver)
+#   -DDISABLE_NCURSES  build without libtinfo or ncurses (disables console commands)
 #   -DDISABLE_LANGINFO build without locale info (affects Unix only; makes no difference unless you
 #                      call setlocale() manually). Does not remove setlocale(LC_CTYPE, "") call.
+#   -DDISABLE_WCHAR    build without wchar_t type or functions. wstring becomes ASCII only (fbc needs to match this).
 #
 # makefile variables may either be set on the make command line,
 # or (in a more permanent way) inside a 'config.mk' file.
@@ -369,6 +370,10 @@ endif
 ALLFBCFLAGS += -e -m fbc -w pedantic
 ALLFBLFLAGS += -e -m fbc -w pedantic
 ALLCFLAGS += -Wall -Wextra -Wno-unused-parameter -Werror-implicit-function-declaration
+
+ifeq ($(TARGET_OS),dos)
+  ALLCFLAGS += -DDISABLE_WCHAR
+endif
 
 ifeq ($(TARGET_OS),xbox)
   ifeq ($(OPENXDK),)
