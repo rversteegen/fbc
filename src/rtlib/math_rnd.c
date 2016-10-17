@@ -5,7 +5,7 @@
 #if defined HOST_WIN32
 	#include <windows.h>
 	#include <wincrypt.h>
-#elif defined HOST_LINUX
+#elif defined HOST_LINUX || defined HOST_ANDROID
 	#include <fcntl.h>
 #endif
 
@@ -120,7 +120,7 @@ static double hRnd_QB ( float n )
 	return (float)iseed / (float)0x1000000;
 }
 
-#if defined HOST_WIN32 || defined HOST_LINUX
+#if defined HOST_WIN32 || defined HOST_LINUX || defined HOST_ANDROID
 static unsigned int hGetRealRndNumber( )
 {
 	union {
@@ -137,7 +137,7 @@ static unsigned int hGetRealRndNumber( )
 		CryptReleaseContext( provider, 0 );
 	}
 
-#elif defined HOST_LINUX
+#else
 	int urandom = open( "/dev/urandom", O_RDONLY );
 	if( urandom != -1 ) {
 		if( read( urandom, &number.b[0], sizeof(number) ) != sizeof(number) ) {
@@ -236,7 +236,7 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		iseed = s;
 		break;
 
-#if defined HOST_WIN32 || defined HOST_LINUX
+#if defined HOST_WIN32 || defined HOST_LINUX || defined HOST_ANDROID
 	case RND_REAL:
 		rnd_func = hRnd_REAL;
 		state[0] = (unsigned int)seed;

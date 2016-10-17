@@ -161,7 +161,9 @@ ifdef TARGET
   TARGET_PREFIX := $(TARGET)-
 
   ifndef TARGET_OS
-    ifneq ($(filter cygwin%,$(triplet)),)
+    ifneq ($(filter android%,$(triplet)),)
+      TARGET_OS := android
+    else ifneq ($(filter cygwin%,$(triplet)),)
       TARGET_OS := cygwin
     else ifneq ($(filter darwin%,$(triplet)),)
       TARGET_OS := darwin
@@ -172,6 +174,7 @@ ifdef TARGET
     else ifneq ($(filter freebsd%,$(triplet)),)
       TARGET_OS := freebsd
     else ifneq ($(filter linux%,$(triplet)),)
+      # GNU/Linux. arm-linux-androideabi is not.
       TARGET_OS := linux
     else ifneq ($(filter mingw%,$(triplet)),)
       TARGET_OS := win32
@@ -364,7 +367,9 @@ endif
 ifdef MULTILIB
   ALLFBCFLAGS += -arch $(MULTILIB)
   ALLFBLFLAGS += -arch $(MULTILIB)
-  ALLCFLAGS   += -m$(MULTILIB)
+  ifneq ($(TARGET_ARCH),arm)
+    ALLCFLAGS += -m$(MULTILIB)
+  endif
 endif
 
 ALLFBCFLAGS += -e -m fbc -w pedantic
@@ -372,7 +377,15 @@ ALLFBLFLAGS += -e -m fbc -w pedantic
 ALLCFLAGS += -Wall -Wextra -Wno-unused-parameter -Werror-implicit-function-declaration
 
 ifeq ($(TARGET_OS),dos)
-  ALLCFLAGS += -DDISABLE_WCHAR
+  ALLCFLAGS += -DDISABLE_WCHAR -DDISABLE_FFI
+endif
+
+ifeq ($(TARGET_OS),android)
+  # These aren't available
+  # Android has very limited locale support in the NDK -- only the C locale is supported.
+  # Locale information is available from Java. The CrystaX alternative NDK has locale support.
+
+  ALLCFLAGS += -DDISABLE_NCURSES -DDISABLE_X11 -DDISABLE_FFI -DDISABLE_LANGINFO -DDISABLE_WCHAR
 endif
 
 ifeq ($(TARGET_OS),xbox)
@@ -445,7 +458,7 @@ RTLIB_DIRS := $(srcdir)/rtlib $(srcdir)/rtlib/$(TARGET_OS) $(srcdir)/rtlib/$(TAR
 ifeq ($(TARGET_OS),cygwin)
   RTLIB_DIRS += $(srcdir)/rtlib/win32
 endif
-ifneq ($(filter darwin freebsd linux netbsd openbsd solaris,$(TARGET_OS)),)
+ifneq ($(filter android darwin freebsd linux netbsd openbsd solaris,$(TARGET_OS)),)
   RTLIB_DIRS += $(srcdir)/rtlib/unix
 endif
 GFXLIB2_DIRS := $(patsubst $(srcdir)/rtlib%,$(srcdir)/gfxlib2%,$(RTLIB_DIRS))
