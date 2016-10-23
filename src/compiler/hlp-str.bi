@@ -132,6 +132,8 @@ declare function hCharNeedsEscaping _
 
 declare function hIsValidHexDigit( byval ch as integer ) as integer
 
+declare function hMaxCodepoint( ) as uinteger
+
 '':::::
 #define ZstrAllocate(chars) xallocate( chars + 1 )
 

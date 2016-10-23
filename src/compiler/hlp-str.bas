@@ -491,8 +491,8 @@ function hReEscape _
 
     		if( isnumber ) then
 				if( cuint( value ) > 255 ) then
-					errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
-					value = 255
+					errReportWarn( FB_WARNINGMSG_CANTENCODECHARACTER )
+					value = asc( "?" )
 				end if
 
 				'' save the oct len, or concatenation would fail
@@ -538,9 +538,11 @@ function hReEscapeW _
 	) as wstring ptr static
 
     static as DWSTRING res
-    dim as integer char, lgt, i, isnumber
+    dim as integer char, lgt, i, isnumber, maxcodepoint
     dim as uinteger value
     dim as wstring ptr src, dst, src_end
+
+	maxcodepoint = hMaxCodepoint( )
 
 	'' convert escape sequences to internal format
 
@@ -551,6 +553,7 @@ function hReEscapeW _
 		return text
 	end if
 
+	'' Worst case size increase is "\" -> "\\", worse than "\xFFFF" -> FB_INTSCAPECHAR "177777"
 	DWstrAllocate( res, lgt * 2 )
 
 	src = text
@@ -718,9 +721,9 @@ function hReEscapeW _
 			end select
 
     		if( isnumber ) then
-				if( cuint( value ) > 65535 ) then
-					errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
-					value = 65535
+				if( cuint( value ) > maxcodepoint ) then
+					errReportWarn( FB_WARNINGMSG_CANTENCODECHARACTER )
+					value = asc( "?" )
 				end if
 
 				'' save the oct len, or concatenation would fail
@@ -757,6 +760,9 @@ function hReEscapeW _
 end function
 
 '':::::
+'' Converts an string possibly containing internal escape codes to a GAS
+'' string literal with C/GAS escape codes.
+'' Note: C backend uses a similar but separate routine to encode, hBuildStrLit()
 function hEscape _
 	( _
 		byval text as const zstring ptr _
@@ -999,22 +1005,28 @@ private function hU16ToWchar _
 
 end function
 
-
 '':::::
+'' Converts an wstring possibly containing internal escape codes to a GAS
+'' string literal representing the target wstring encoding using C/GAS
+'' escape codes.
+'' This is a lossy conversion because UTF-16 surrogates not implemented yet.
+'' Note: C backend uses a similar but separate routine to encode, hBuildWstrLit()
 function hEscapeW _
 	( _
 		byval text as wstring ptr _
 	) as zstring ptr static
 
     static as DZSTRING res
-    dim as uinteger char, c
-	dim as integer lgt, i, wcharlen
+    dim as uinteger char, c, maxcodepoint
+	dim as integer lgt, i, wcharlen, warn_unencodable
     dim as wstring ptr src, src_end
     dim as zstring ptr dst
 
 	'' convert the internal escape sequences to GAS format
 
 	wcharlen = typeGetSize( FB_DATATYPE_WCHAR )
+	maxcodepoint = hMaxCodepoint( )
+	warn_unencodable = FALSE
 
 	'' up to (4 * wcharlen) ascii chars can be used per unicode char
 	'' (up to one '\ooo' per byte of wchar)
@@ -1069,13 +1081,19 @@ function hEscapeW _
 
 		end if
 
+		if( char > maxcodepoint ) then
+			'' Give a warning instead of silently corrupting the string
+			warn_unencodable = TRUE
+			char = asc( "?" )
+		end if
+
 		'' convert every char to octagonal form as GAS can't
 		'' handle unicode literal strings
 		for i = 1 to wcharlen
 			*dst = CHAR_RSLASH
 			dst += 1
 
-			'' x86 little-endian assumption
+			'' little-endian assumption
 			c = char and 255
 			if( c < 8 ) then
 				dst[0] = CHAR_0 + c
@@ -1100,6 +1118,10 @@ function hEscapeW _
 
 	'' null=term
 	*dst = 0
+
+	if( warn_unencodable ) then
+		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , """" & *res.data & """"  )
+	end if
 
 	function = res.data
 
@@ -1254,4 +1276,20 @@ function hIsValidHexDigit( byval ch as integer ) as integer
 	function = ((ch >= asc( "0" )) and (ch <= asc( "9" ))) or _
 	           ((ch >= asc( "a" )) and (ch <= asc( "f" ))) or _
 	           ((ch >= asc( "A" )) and (ch <= asc( "F" )))
+end function
+
+'':::::
+'' Largest character (whether valid unicode or not) representable in a wstring on the target
+function hMaxCodepoint( ) as uinteger
+	dim as integer wcharlen = typeGetSize( FB_DATATYPE_WCHAR )
+	if wcharlen = 1 then
+		function = 255
+	elseif wcharlen = 2 then
+		'' Splitting up larger characters into UTF-16 surrogates is not
+		'' yet supported; we only do UCS-2 encoding.
+		'function = &h10ffff
+		function = &hffff
+	else
+		function = &hffffffffU
+	end if
 end function

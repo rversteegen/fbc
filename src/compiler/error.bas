@@ -81,7 +81,8 @@ declare function hMakeParamDesc _
 		( 0, @"Mismatching parameter initializer" ), _
 		( 1, @"" ), _  '' FB_WARNINGMSG_AMBIGIOUSLENSIZEOF
 		( 0, @"Suspicious logic operation, mixed boolean and non-boolean operands" ), _
-		( 0, @"Redefinition of intrinsic" ) _
+		( 0, @"Redefinition of intrinsic" ), _
+		( 1, @"wstring contains unencodable characters, target's sizeof(wstring) is too small: " ) _
 	}
 
 	dim shared errorMsgs( 1 to FB_ERRMSGS-1 ) as const zstring ptr => _
@@ -676,7 +677,8 @@ sub errReportWarnEx _
 		byval msgex as const zstring ptr, _
 		byval linenum as integer, _
 		byval options as FB_ERRMSGOPT, _
-		byval customText as const zstring ptr _
+		byval customText as const zstring ptr, _
+		byval customTextW as const wstring ptr _
 	)
 
 	if( (msgnum < 1) or (msgnum >= FB_WARNINGMSGS) ) then
@@ -714,6 +716,9 @@ sub errReportWarnEx _
 	print *warningMsgs(msgnum).text;
 	if( customText ) then
 		print *customText;
+	end if
+	if( customTextW ) then
+		print *customTextW;
 	end if
 
 	if( msgex <> NULL ) then

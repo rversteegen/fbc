@@ -2041,6 +2041,8 @@ private sub hBuildStrLit _
 	'' Convert the string to something suitable for C
 	'' (assuming internal escape sequences have already been solved out
 	'' using hUnescape())
+	'' (Note: this function is mostly redundant to hEscape(), but does
+	'' some C-specific escaping.)
 	'' Non-ASCII characters and also \ or " must be escaped, but also care
 	'' must be taken when normal chars following an escape sequence would
 	'' be seen as part of that escape sequence. This is handled by splitting
@@ -2094,18 +2096,24 @@ private sub hBuildWstrLit _
 		byval length as longint _  '' including null terminator
 	)
 
-	dim as integer ch = any
-	dim as integer wcharsize = any
+	dim as uinteger ch = any
+	dim as integer wcharsize = any, maxcodepoint = any, warn_unencodable = FALSE
 
-	'' (ditto)
+	'' (ditto, hUnescapeW() and hEscapeW() respectively)
 
 	ln += "L"""
 	wcharsize = typeGetSize( FB_DATATYPE_WCHAR )
+	maxcodepoint = hMaxCodepoint( )
 
 	'' Don't bother emitting the null terminator explicitly - gcc will add
 	'' it automatically already
 	for i as integer = 0 to length - 2
 		ch = (*w)[i]
+
+		if( ch > maxcodepoint ) then
+			warn_unencodable = TRUE
+			ch = asc( "?" )
+		end if
 
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
 			ln += $"\x" + hex( ch, wcharsize * 2 )
@@ -2129,6 +2137,10 @@ private sub hBuildWstrLit _
 	next
 
 	ln += """"
+
+	if( warn_unencodable ) then
+		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , """" & *w & """"  )
+	end if
 end sub
 
 private function hBopToStr( byval op as integer ) as zstring ptr

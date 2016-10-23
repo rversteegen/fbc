@@ -371,6 +371,7 @@ enum FB_WARNINGMSG
 	FB_WARNINGMSG_AMBIGIOUSLENSIZEOF
 	FB_WARNINGMSG_OPERANDSMIXEDTYPES
 	FB_WARNINGMSG_REDEFINITIONOFINTRINSIC
+	FB_WARNINGMSG_CANTENCODECHARACTER
 
 	FB_WARNINGMSGS
 end enum
@@ -427,7 +428,8 @@ declare sub errReportWarnEx _
 		byval msgex as const zstring ptr = NULL, _
 		byval linenum as integer = 0, _
 		byval options as FB_ERRMSGOPT = FB_ERRMSGOPT_DEFAULT, _
-		byval customText as const zstring ptr = NULL _
+		byval customText as const zstring ptr = NULL, _
+		byval customTextW as const wstring ptr = NULL _
 	)
 
 declare sub errReportParam _
