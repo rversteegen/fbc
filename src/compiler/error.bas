@@ -169,8 +169,8 @@ declare function hMakeParamDesc _
 		@"Selected non-x86 CPU when compiling for DOS", _
 		@"Selected -gen gas ASM backend for non-x86 CPU", _
 		@"-asm att used for -gen gas, but -gen gas only supports -asm intel", _
-		@"-pic used when making executable (only works when making a shared library)", _
-		@"-pic used, but not supported by target system (only works for non-x86 Unixes)", _
+		@"-pic is not supported with -gen gas", _
+		@"-pic used, but not supported by target system (only works for Unixes)", _
 		@"Graphics routines were used, but the gfxlib has not been ported to this target", _
 		@"Var-len strings cannot be initialized", _
 		@"Recursive TYPE or UNION not allowed", _

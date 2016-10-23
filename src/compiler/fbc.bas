@@ -2222,6 +2222,13 @@ private function hTargetNeedsPIC( ) as integer
 		     FB_COMPTARGET_ANDROID
 			function = TRUE
 		end select
+	else
+		'' On android-x86, PIC is necessary even to access globals in dynamic
+		'' libraries, because the runtime linker doesn't support usual relocation types.
+		'' GCC default to -fPIC anyway, but we need to be aware of whether PIC is used.
+		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID ) then
+			function = TRUE
+		end if
 	end if
 end function
 
@@ -2293,6 +2300,21 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 		fbcEnd( 1 )
 	end if
 
+	'' 4.5. Enable -pic automatically when building a shared library on Unixes
+	if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID) ) then
+		if( hTargetNeedsPIC( ) ) then
+			fbSetOption( FB_COMPOPT_PIC, TRUE )
+		end if
+	end if
+
+	'' Complain if -pic was given in cases where it's not needed/supported
+	if( fbGetOption( FB_COMPOPT_PIC ) ) then
+		if( hTargetNeedsPIC( ) = FALSE ) then
+			errReportEx( FB_ERRMSG_PICNOTSUPPORTEDFORTARGET, "", -1 )
+		end if
+	end if
+
 	'' 5. Select default backend based on selected arch, e.g. when compiling
 	''    for x86-64 or ARM, we shouldn't default to -gen gas anymore (as
 	''    long as it doesn't support it).
@@ -2306,6 +2328,10 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 	else
 		fbSetOption( FB_COMPOPT_BACKEND, FB_BACKEND_GCC )
 	end if
+	'' gas doesn't currently support -pic
+	if( fbGetOption( FB_COMPOPT_PIC ) ) then
+		fbSetOption( FB_COMPOPT_BACKEND, FB_BACKEND_GCC )
+	end if
 
 	'' 6. -gen overrides any other backend setting.
 	if( fbc.backend >= 0 ) then
@@ -2314,10 +2340,14 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 
 	'' 7. Check whether backend supports the target/arch.
 	'' -gen gas with non-x86 arch isn't possible.
-	if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) and _
-	    (fbGetCpuFamily( ) <> FB_CPUFAMILY_X86) ) then
-		errReportEx( FB_ERRMSG_GENGASWITHNONX86, fbGetFbcArch( ), -1 )
-		fbcEnd( 1 )
+	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS ) then
+		if( fbGetCpuFamily( ) <> FB_CPUFAMILY_X86 ) then
+			errReportEx( FB_ERRMSG_GENGASWITHNONX86, fbGetFbcArch( ), -1 )
+			fbcEnd( 1 )
+		elseif( fbGetOption( FB_COMPOPT_PIC ) ) then
+			errReportEx( FB_ERRMSG_GENGASWITHPIC, "", -1 )
+			fbcEnd( 1 )
+		end if
 	end if
 
 	'' Resource scripts are only allowed for win32 & co,
@@ -2361,22 +2391,6 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 
 		'' -asm overrides the target's default
 		fbSetOption( FB_COMPOPT_ASMSYNTAX, fbc.asmsyntax )
-	end if
-
-	'' Enable -pic automatically when building a shared library on non-x86 Unixes
-	if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
-		if( hTargetNeedsPIC( ) ) then
-			fbSetOption( FB_COMPOPT_PIC, TRUE )
-		end if
-	end if
-
-	'' Complain if -pic was given in cases where it's not needed/supported
-	if( fbGetOption( FB_COMPOPT_PIC ) ) then
-		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
-			errReportEx( FB_ERRMSG_PICNOTSUPPORTEDFOREXE, "", -1 )
-		elseif( hTargetNeedsPIC( ) = FALSE ) then
-			errReportEx( FB_ERRMSG_PICNOTSUPPORTEDFORTARGET, "", -1 )
-		end if
 	end if
 
 	'' TODO: Check whether subsystem/stacksize/xboxtitle were set and
