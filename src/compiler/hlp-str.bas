@@ -292,7 +292,61 @@ function hReplaceChar _
 
 end function
 
+''::::
+#macro DEFINE_HEX_PARSER( FUNCNAME, SRC_TYPE )
+	'' Read a fixed-length hexidecimal number. Returns -1 if invalid.
+	function FUNCNAME _
+		( _
+			byval src as SRC_TYPE, _
+			byval numdigits as integer _
+		) as uinteger static
+
+		dim as uinteger char, c
+		dim as integer i
+
+		'' x86 little-endian assumption
+		char = 0
+
+		for i = 1 to numdigits
+			'' Decimal digit?
+			c = *src - CHAR_0
+			src += 1
+
+			if( c > 9 ) then
+				'' Uppercase hex digit?
+				c -= (CHAR_AUPP - CHAR_9 - 1)
+			end if
+			if( c > 16 ) then
+				'' Lowercase hex digit?
+				c -= (CHAR_ALOW - CHAR_AUPP)
+			end if
+			if( c < 0 or c > 16 ) then
+				'' None of the above
+				return -1
+			end if
+			char = (char * 16) or c
+		next
+
+		function = char
+
+	end function
+#endmacro
+
+DEFINE_HEX_PARSER( WstrReadFixedHex, wstring ptr )
+DEFINE_HEX_PARSER( ZstrReadFixedHex, zstring ptr )
+
+
 '':::::
+'' Takes a raw string literal from the lexer containing FB escape codes, and
+'' translates escape codes into internal ones, except for \u or \U which are
+'' copied directly without being converted or validated. isunicode is set to
+'' TRUE if \u or \U occur (casting the result to a wstring yields a valid
+'' internal-escaped wstring).
+''
+'' Note that the lexer has already processed "" escapes and escaped \'s if
+'' necessary.
+''
+'' textlen: recieves the length of the string as seen by the program
 function hReEscape _
 	( _
 		byval text as zstring ptr, _
@@ -301,10 +355,10 @@ function hReEscape _
 	) as zstring ptr static
 
     static as DZSTRING res
-    dim as integer char, lgt, i, value, isnumber
+    dim as integer char, lgt, i, value, isnumber, warn_badescape
     dim as zstring ptr src, dst, src_end
 
-    '' convert escape sequences to internal format
+	warn_badescape = FALSE
 
 	isunicode = FALSE
 	textlen = 0
@@ -329,6 +383,10 @@ function hReEscape _
 
 			if( src >= src_end ) then exit do
 
+			'' Convert variable length codes starting with {\,\x,\X,\&h,\&H,\&o,\&O,\&b,\&B}
+			'' for an 8 bit character, and also \a, into internal escape codes.
+			'' We also copy through \u and \U but do NOT convert them.
+
 			'' change to internal
 			*dst = FB_INTSCAPECHAR
 			dst += 1
@@ -350,6 +408,7 @@ function hReEscape _
 
 					char = *src
 					if( (char < CHAR_0) or (char > CHAR_9) ) then
+						'' Less than 3 digits; not an error
 						exit for
 					end if
 					value = (value * 10) + (char - CHAR_0)
@@ -462,7 +521,7 @@ function hReEscape _
 
 				'' break in two 16-bit..
 
-				'' 'u'
+				'' 'U'
 				*dst = CHAR_UUPP
 				dst += 1
 
@@ -472,7 +531,7 @@ function hReEscape _
 					src += 1
 				next
 
-				'' '\u'
+				'' '\U'
 				dst[0] = FB_INTSCAPECHAR
 				dst[1] = CHAR_UUPP
 				dst += 2
@@ -528,9 +587,25 @@ function hReEscape _
 
 	function = res.data
 
+	if( warn_badescape ) then
+		errReportWarn( FB_WARNINGMSG_INVALIDUTFESCAPE )
+	end if
+
 end function
 
 '':::::
+'' Takes a raw string literal from the lexer containing FB escape codes, and
+'' translates escape codes into internal ones, except for \u or \U which are
+'' copied directly without being converted or validated.
+''
+'' Note that the parsing of escape codes (their max length) di
+''
+'' Note that the lexer has already translated the string from the file encoding
+'' to host wstring encoding, possibly introducing UTF-16 surrogates, processed
+'' "" escapes, and escaped \'s if necessary.
+''
+'' textlen: recieves the length of the string as seen by the program (i.e. after
+''     emitted to the target encoding).
 function hReEscapeW _
 	( _
 		byval text as wstring ptr, _
@@ -538,13 +613,14 @@ function hReEscapeW _
 	) as wstring ptr static
 
     static as DWSTRING res
-    dim as integer char, lgt, i, isnumber, maxcodepoint
+    dim as integer char, lgt, i, isnumber, maxcodepoint, warn_badescape
     dim as uinteger value
     dim as wstring ptr src, dst, src_end
 
 	maxcodepoint = hMaxCodepoint( )
 
 	'' convert escape sequences to internal format
+	warn_badescape = FALSE
 
 	textlen = 0
 
@@ -679,6 +755,21 @@ function hReEscapeW _
 				*dst = char
 				dst += 1
 
+				'' Validate it
+			    	if( src + 4 > src_end ) then
+						errReportWarn( FB_WARNINGMSG_INVALIDUTFESCAPE )
+						warn_badescape = TRUE
+						exit do
+					end if
+			    	char = WstrReadFixedHex( src, 4 )
+					if( char = -1 ) then
+						'' Invalid; skip it.
+						errReportWarn( FB_WARNINGMSG_INVALIDUTFESCAPE )
+						'warn_badescape = TRUE
+						exit do
+					end if
+
+
 				for i = 1 to 4
 					*dst = *src
 					dst += 1
@@ -693,7 +784,7 @@ function hReEscapeW _
 			case CHAR_UUPP
 				'' break in two 16-bit..
 
-				'' 'u'
+				'' 'U'
 				*dst = CHAR_UUPP
 				dst += 1
 
@@ -703,7 +794,7 @@ function hReEscapeW _
 					src += 1
 				next
 
-				'' '\u'
+				'' '\U'
 				dst[0] = FB_INTSCAPECHAR
 				dst[1] = CHAR_UUPP
 				dst += 2
@@ -756,6 +847,10 @@ function hReEscapeW _
 	*dst = 0
 
 	function = res.data
+
+	if( warn_badescape ) then
+'		errReportWarn( FB_WARNINGMSG_INVALIDUTFESCAPE )
+	end if
 
 end function
 
@@ -975,36 +1070,6 @@ function hHasEscapeW _
 
 end function
 
-''::::
-private function hU16ToWchar _
-	( _
-		byval src as wstring ptr _
-	) as uinteger static
-
-	dim as uinteger char, c
-	dim as integer i
-
-	'' x86 little-endian assumption
-	char = 0
-
-	for i = 1 to 4
-		c = *src - CHAR_0
-		src += 1
-
-		if( c > 9 ) then
-			c -= (CHAR_AUPP - CHAR_9 - 1)
-        end if
-        if( c > 16 ) then
-        	c -= (CHAR_ALOW - CHAR_AUPP)
-        end if
-
-		char = (char * 16) or c
-	next
-
-	function = char
-
-end function
-
 '':::::
 '' Converts an wstring possibly containing internal escape codes to a GAS
 '' string literal representing the target wstring encoding using C/GAS
@@ -1018,7 +1083,7 @@ function hEscapeW _
 
     static as DZSTRING res
     dim as uinteger char, c, maxcodepoint
-	dim as integer lgt, i, wcharlen, warn_unencodable
+	dim as integer lgt, i, wcharlen, warn_unencodable, warn_badescape
     dim as wstring ptr src, src_end
     dim as zstring ptr dst
 
@@ -1027,6 +1092,7 @@ function hEscapeW _
 	wcharlen = typeGetSize( FB_DATATYPE_WCHAR )
 	maxcodepoint = hMaxCodepoint( )
 	warn_unencodable = FALSE
+	warn_badescape = FALSE
 
 	'' up to (4 * wcharlen) ascii chars can be used per unicode char
 	'' (up to one '\ooo' per byte of wchar)
@@ -1058,7 +1124,7 @@ function hEscapeW _
 				i = char
 				char = 0
 
-				if( src + i > src_end ) then exit do
+				if( src + i > src_end ) then exit do  '' Shouldn't happen?
 
 				do while( i > 0 )
 					char = (char * 8) + (*src - CHAR_0)
@@ -1067,10 +1133,18 @@ function hEscapeW _
 				loop
 
 			else
-			    '' unicode 16-bit?
+			    '' \uXXXX: 16-bit unicode (has not been validated yet)
 			    if( char = asc( "u" ) ) then
-			    	if( src + 4 > src_end ) then exit do
-			    	char = hU16ToWchar( src )
+			    	if( src + 4 > src_end ) then
+						warn_badescape = TRUE
+						exit do
+					end if
+			    	char = WstrReadFixedHex( src, 4 )
+					if( char = -1 ) then
+						warn_badescape = TRUE
+						exit do
+					end if
+
 			    	src += 4
 
                 '' remap char as they will become a octagonal seq
@@ -1083,6 +1157,7 @@ function hEscapeW _
 
 		if( char > maxcodepoint ) then
 			'' Give a warning instead of silently corrupting the string
+			'' (TODO: split into UTF-16 surrogates instead)
 			warn_unencodable = TRUE
 			char = asc( "?" )
 		end if
@@ -1122,12 +1197,18 @@ function hEscapeW _
 	if( warn_unencodable ) then
 		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , """" & *res.data & """"  )
 	end if
+	if( warn_badescape ) then
+? "!!! hEscapeW bad utf escape"
+'		errReportWarn( FB_WARNINGMSG_INVALIDUTFESCAPE )
+	end if
 
 	function = res.data
 
 end function
 
 '':::::
+'' Note that \u codes will not occur, because they cause string literals to be
+'' converted to wstrings (see 
 function hUnescape _
 	( _
 		byval text as zstring ptr _
@@ -1190,14 +1271,18 @@ function hUnescape _
 end function
 
 '':::::
+'' Convert an escaped wstring with internal escape codes into
+'' a regular host wstring. Lossly conversion.
 function hUnescapeW _
 	( _
 		byval text as wstring ptr _
 	) as wstring ptr static
 
     static as DWSTRING res
-    dim as integer char, lgt, i
+    dim as integer lgt, i, warn_badescape
+	dim as uinteger char
     dim as wstring ptr src, dst, src_end
+	warn_badescape = FALSE
 
 	lgt = len( *text )
 	if( lgt = 0 ) then
@@ -1233,10 +1318,17 @@ function hUnescapeW _
 				loop
 
 			else
-			    '' unicode 16-bit?
+			    '' \uXXXX: 16-bit unicode (has not been validated yet)
 			    if( char = asc( "u" ) ) then
-			    	if( src + 4 > src_end ) then exit do
-			    	char = hU16ToWchar( src )
+			    	if( src + 4 > src_end ) then
+						warn_badescape = TRUE
+						exit do
+					end if
+			    	char = WstrReadFixedHex( src, 4 )
+					if( char = -1 ) then
+						warn_badescape = TRUE
+						exit do
+					end if
 			    	src += 4
 
                 '' remap char as they will become a octagonal seq
@@ -1254,6 +1346,10 @@ function hUnescapeW _
 
     '' null-term
     *dst = 0
+
+	if( warn_badescape ) then
+		errReportWarn( FB_WARNINGMSG_INVALIDUTFESCAPE )
+	end if
 
     function = res.data
 

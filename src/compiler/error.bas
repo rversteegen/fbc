@@ -82,7 +82,8 @@ declare function hMakeParamDesc _
 		( 1, @"" ), _  '' FB_WARNINGMSG_AMBIGIOUSLENSIZEOF
 		( 0, @"Suspicious logic operation, mixed boolean and non-boolean operands" ), _
 		( 0, @"Redefinition of intrinsic" ), _
-		( 1, @"wstring contains unencodable characters, target's sizeof(wstring) is too small: " ) _
+		( 1, @"wstring contains unencodable characters, target's sizeof(wstring) is too small" ), _
+		( 1, @$"Invalid \uXXXX escape code (must be exactly 4 hex digits)" ) _
 	}
 
 	dim shared errorMsgs( 1 to FB_ERRMSGS-1 ) as const zstring ptr => _

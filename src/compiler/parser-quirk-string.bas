@@ -214,6 +214,8 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 			ws = ""
 		end if
 
+		'' Generate internal escape codes, allowing us to represent
+		'' characters that don't fit in the compiler's sizeof(wstring).
 		for i = 0 to cnt-1
 			v = astConstFlushToInt( exprtb(i), FB_DATATYPE_ULONG )
 			exprtb(i) = NULL
