@@ -19,6 +19,7 @@ XARGS := xargs
 GREP := grep
 SED := sed
 ECHO := echo
+CAT := cat
 PRINTF := printf
 
 ifndef FBC
@@ -37,6 +38,7 @@ endif
 # ------------------------------------------------------------------------
 
 CUNIT_TESTS_INC := cunit-tests.inc
+CUNIT_TESTS_EXTRA := cunit-tests-extra.inc
 
 SRCLIST :=
 ifeq ($(MAKECMDGOALS),mostlyclean)
@@ -121,7 +123,7 @@ make_fbcu : $(FBCU_BIN)
 # from all dirs listed in DIRLIST from DIRLIST_INC
 #
 #
-$(CUNIT_TESTS_INC) : $(DIRLIST_INC)
+$(CUNIT_TESTS_INC) : $(DIRLIST_INC) $(CUNIT_TESTS_EXTRA)
 	@$(PRINTF) "Generating $(CUNIT_TESTS_INC) : "
 	@$(ECHO) "# This file automatically generated - DO NOT EDIT" > $(CUNIT_TESTS_INC)
 	@$(ECHO) "#" >> $(CUNIT_TESTS_INC)
@@ -133,6 +135,7 @@ $(CUNIT_TESTS_INC) : $(DIRLIST_INC)
 | $(XARGS) $(GREP) -l -i -E '[[:space:]]*.[[:space:]]*TEST_MODE[[:space:]]*\:[[:space:]]*CUNIT_COMPATIBLE' \
 | $(SED) -e 's/\(^.*\)/\SRCLIST \+\= \.\/\1/g' \
 >> $(CUNIT_TESTS_INC)
+	@$(CAT) $(CUNIT_TESTS_EXTRA) >> $(CUNIT_TESTS_INC)
 	@$(ECHO) "Done"
 
 # ------------------------------------------------------------------------

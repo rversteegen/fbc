@@ -2099,6 +2099,7 @@ private sub hBuildWstrLit _
 	dim as uinteger ch = any
 	dim as integer wcharsize = any, maxcodepoint = any, warn_unencodable = FALSE
 
+?"hBuildWstrLit"
 	'' (ditto, hUnescapeW() and hEscapeW() respectively)
 
 	ln += "L"""
@@ -2111,6 +2112,7 @@ private sub hBuildWstrLit _
 		ch = (*w)[i]
 
 		if( ch > maxcodepoint ) then
+?"char " & hex(ch) & " max " & maxcodepoint
 			warn_unencodable = TRUE
 			ch = asc( "?" )
 		end if
@@ -2139,7 +2141,7 @@ private sub hBuildWstrLit _
 	ln += """"
 
 	if( warn_unencodable ) then
-		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , """" & *w & """"  )
+		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , ": """ & *w & """"  )
 	end if
 end sub
 

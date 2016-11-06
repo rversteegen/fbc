@@ -722,7 +722,7 @@ function hReEscapeW _
 
     		if( isnumber ) then
 				if( cuint( value ) > maxcodepoint ) then
-					errReportWarn( FB_WARNINGMSG_CANTENCODECHARACTER )
+					errReportWarn( FB_WARNINGMSG_CANTENCODECHARACTER, "(ReEscape)" )
 					value = asc( "?" )
 				end if
 
@@ -1015,7 +1015,6 @@ function hEscapeW _
 	( _
 		byval text as wstring ptr _
 	) as zstring ptr static
-
     static as DZSTRING res
     dim as uinteger char, c, maxcodepoint
 	dim as integer lgt, i, wcharlen, warn_unencodable
@@ -1034,6 +1033,8 @@ function hEscapeW _
 	if( lgt = 0 ) then
 		return NULL
 	end if
+
+?"------ hEscapeW" ', len "& lgt & " " & *text
 
 	DZstrAllocate( res, lgt * (1+3) * wcharlen )
 
@@ -1081,6 +1082,7 @@ function hEscapeW _
 
 		end if
 
+'?"char " & char & " " & chr(char)
 		if( char > maxcodepoint ) then
 			'' Give a warning instead of silently corrupting the string
 			warn_unencodable = TRUE
@@ -1120,7 +1122,7 @@ function hEscapeW _
 	*dst = 0
 
 	if( warn_unencodable ) then
-		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , """" & *res.data & """"  )
+		errReportWarnEx( FB_WARNINGMSG_CANTENCODECHARACTER, , , , , ": """ & *hUnescapeW( text ) & """"  )
 	end if
 
 	function = res.data
@@ -1203,6 +1205,8 @@ function hUnescapeW _
 	if( lgt = 0 ) then
 		return text
 	end if
+?"------ hUnescapeW, len "& lgt & " " & *text
+
 
 	DWstrAllocate( res, lgt )
 
@@ -1247,6 +1251,9 @@ function hUnescapeW _
 
 		end if
 
+?"char " & char & " " & chr(char)
+
+
 		*dst = char
 		dst += 1
 
@@ -1254,6 +1261,7 @@ function hUnescapeW _
 
     '' null-term
     *dst = 0
+?"------ hUnescapeW DONE"
 
     function = res.data
 

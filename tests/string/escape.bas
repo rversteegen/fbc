@@ -470,6 +470,28 @@ namespace combination
 	end sub
 end namespace
 
+'' The following testcase is duplicated in wstring/escape.bas,
+'' because escape code processing varies based on the file encoding!
+'' String literals are
+sub wstring_escape_codes
+
+        dim as wstring ptr hello_Greek = hello_in_Greek( )
+        dim as wstring ptr hello_Etruscan = hello_in_Etruscan( )
+
+	hello_escaped = !"\66359\66352\66361\66363\66371"
+	CU_ASSERT( hello_escaped = hello_Etruscan )
+	CU_ASSERT( asc( hello_escaped, 2 ) = 66352 )
+	hello_escaped = !"\x10337\x10330\x10339\x1033B\x10343"
+	CU_ASSERT( hello_escaped = hello_Etruscan )
+	CU_ASSERT( asc( hello_escaped, 2 ) = 66352 )
+	hello_escaped = !"\&h10337\&h10330\&h10339\&h1033B\&h10343"
+	CU_ASSERT( hello_escaped = hello_Etruscan )
+	CU_ASSERT( asc( hello_escaped, 2 ) = 66352 )
+	hello_escaped = !"\u10337\u10330\u10339\u1033B\u10343"
+	CU_ASSERT( hello_escaped = hello_Etruscan )
+	CU_ASSERT( asc( hello_escaped, 2 ) = 66352 )
+end sub
+
 private sub ctor( ) constructor
 	fbcu.add_suite( "fbc_tests.string.escape" )
 	fbcu.add_test( "escape", @escapeTest )
@@ -487,6 +509,7 @@ private sub ctor( ) constructor
 	fbcu.add_test( "hex escape", @escapeHex1.test )
 	fbcu.add_test( "digit behind escape", @digitBehindEscape.test )
 	fbcu.add_test( "combination", @combination.test )
+	fbcu.add_test( "wstring escapes", @wstring_escape_codes )
 end sub
 
 end namespace
