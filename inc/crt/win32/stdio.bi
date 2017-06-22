@@ -87,6 +87,12 @@ declare function _wpopen (byval as wchar_t ptr, byval as wchar_t ptr) as FILE pt
 declare function _fgetwchar () as wint_t
 declare function _fputwchar (byval as wint_t) as wint_t
 declare function _tempnam (byval as zstring ptr, byval as zstring ptr) as zstring ptr
+
+declare function getwc (byval as FILE ptr) as wint_t
+declare function getwchar () as wint_t
+declare function putwc (byval as wint_t, byval as FILE ptr) as wint_t
+declare function putwchar (byval as wint_t) as wint_t
+
 end extern
 
 #endif

@@ -1,13 +1,5 @@
-''
-''
-'' stdio -- header translated with help of SWIG FB wrapper
-''
-'' NOTICE: This file is part of the FreeBASIC Compiler package and can't
-''         be included in other distributions without authorization.
-''
-''
-#ifndef __crt_linux_stdio_bi__
-#define __crt_linux_stdio_bi__
+#ifndef __crt_freebsd_stdio_bi__
+#define __crt_freebsd_stdio_bi__
 
 #define _IOFBF 0
 #define _IOLBF 1
@@ -15,7 +7,7 @@
 #define BUFSIZ 1024
 #define FILENAME_MAX 1024
 #define FOPEN_MAX 20
-#define P_tmpdir "/var/tmp"
+#define P_tmpdir "/tmp"   'Actual P_tmpdir on FreeBSD is "/tmp/"
 #define L_tmpnam 1024
 #define TMP_MAX 308915776
 
@@ -25,7 +17,7 @@ extern stdin alias "__stdinp" as FILE ptr
 extern stdout alias "__stdoutp" as FILE ptr
 extern stderr alias "__stderrp" as FILE ptr
 
-type fpos_t as longint
+type fpos_t as longint   'Equal to __off_t
 
 extern "c"
 declare function snprintf (byval s as zstring ptr, byval n as size_t, byval format as zstring ptr, ...) as long
@@ -35,12 +27,10 @@ declare function pclose (byval as FILE ptr) as long
 declare function getw (byval as FILE ptr) as long
 declare function putw (byval as long, byval as FILE ptr) as long
 
-' CHECKME
-declare function getwc (byval as FILE ptr) as wint_t
-declare function getwchar () as wint_t
-declare function putwc (byval as wint_t, byval as FILE ptr) as wint_t
-declare function putwchar (byval as wint_t) as wint_t
-
+#define getwc(fp) fgetwc(fp)
+#define getwchar() fgetwc(stdin)
+#define putwc(wc, fp) fputwc(wc, fp)
+#define putwchar(wc) fputwc(wc, stdout)
 end extern
 
 #endif

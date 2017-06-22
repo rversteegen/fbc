@@ -34,6 +34,12 @@ declare function popen (byval as zstring ptr, byval as zstring ptr) as FILE ptr
 declare function pclose (byval as FILE ptr) as long
 declare function getw (byval as FILE ptr) as long
 declare function putw (byval as long, byval as FILE ptr) as long
+
+declare function getwc (byval as FILE ptr) as wint_t
+declare function getwchar () as wint_t
+declare function putwc (byval as wint_t, byval as FILE ptr) as wint_t
+declare function putwchar (byval as wint_t) as wint_t
+
 end extern
 
 #endif

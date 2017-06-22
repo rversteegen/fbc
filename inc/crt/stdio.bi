@@ -29,6 +29,13 @@
 #include once "crt/linux/stdio.bi"
 #elseif defined(__FB_DARWIN__)
 #include once "crt/darwin/stdio.bi"
+#elseif defined(__FB_FREEBSD__)
+#include once "crt/freebsd/stdio.bi"
+#elseif defined(__FB_UNIX__)
+'' Other Unices are likely to be BSD variants. stdio.bi is the most important
+'' crt header, so try to make FB work on other OSes.
+#print WARNING: Platform not supported; falling back to FreeBSD stdio.bi header
+#include once "crt/freebsd/stdio.bi"
 #else
 #error Unsupported platform
 #endif
@@ -93,10 +100,6 @@ declare function fputwc (byval as wchar_t, byval as FILE ptr) as wint_t
 declare function ungetwc (byval as wchar_t, byval as FILE ptr) as wint_t
 declare function fgetws (byval as wchar_t ptr, byval as long, byval as FILE ptr) as wchar_t ptr
 declare function fputws (byval as wchar_t ptr, byval as FILE ptr) as long
-declare function getwc (byval as FILE ptr) as wint_t
-declare function getwchar () as wint_t
-declare function putwc (byval as wint_t, byval as FILE ptr) as wint_t
-declare function putwchar (byval as wint_t) as wint_t
 declare function snwprintf (byval s as wchar_t ptr, byval n as size_t, byval format as wchar_t ptr, ...) as long
 declare function vsnwprintf (byval s as wchar_t ptr, byval n as size_t, byval format as wchar_t ptr, byval arg as va_list) as long
 declare function vwscanf (byval as wchar_t ptr, byval as va_list) as long

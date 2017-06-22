@@ -21,10 +21,13 @@
 #elseif defined(__FB_DARWIN__)
 '' FIXME: may be wrong
 #include once "crt/linux/time.bi"
+#elseif defined(__FB_FREEBSD__)
+'#include once "crt/freebsd/time.bi"
 #else
-#error Unsupported platform
+'' POSIX and extensions for other Unices unsupported
 #endif
 
+#if not defined(__FB_FREEBSD__)
 extern "c"
 declare function clock () as clock_t
 declare function time_ alias "time" (byval as time_t ptr = NULL) as time_t
@@ -37,5 +40,5 @@ declare function localtime (byval as time_t ptr) as tm ptr
 declare function strftime (byval as zstring ptr, byval as size_t, byval as zstring ptr, byval as tm ptr) as size_t
 declare function wcsftime (byval as wchar_t ptr, byval as size_t, byval as wchar_t ptr, byval as tm ptr) as size_t
 end extern
-
+#endif
 #endif
