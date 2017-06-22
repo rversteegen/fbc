@@ -237,6 +237,34 @@ private function fbcAddObj( byref file as string ) as string ptr
 	function = s
 end function
 
+'' Pass some arguments to gcc and read the results. Returns an empty string on
+'' an error.
+function fbcQueryGcc( byref options as string ) as string
+	dim as string path
+	fbcFindBin( FBCTOOL_GCC, path )
+
+	select case( fbGetCpuFamily( ) )
+	case FB_CPUFAMILY_X86
+		path += " -m32"
+	case FB_CPUFAMILY_X86_64
+		path += " -m64"
+	end select
+
+	path += options
+
+	dim as integer ff = freefile( )
+	if( open pipe( path, for input, as ff ) <> 0 ) then
+		exit function
+	end if
+
+	dim ret as string
+	input #ff, ret
+
+	close ff
+
+	return ret
+end function
+
 ''
 '' Build the path to a certain file in our lib/ directory (or, in case of
 '' non-standalone, somewhere in a system directory such as /usr/lib).
@@ -274,26 +302,10 @@ private function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
 	end if
 
 	'' Not found in our lib/, query the target-specific gcc
-	dim as string path
-	fbcFindBin( FBCTOOL_GCC, path )
-
-	select case( fbGetCpuFamily( ) )
-	case FB_CPUFAMILY_X86
-		path += " -m32"
-	case FB_CPUFAMILY_X86_64
-		path += " -m64"
-	end select
-
-	path += " -print-file-name=" + *file
-
-	dim as integer ff = freefile( )
-	if( open pipe( path, for input, as ff ) <> 0 ) then
+	found = fbcQueryGcc( " -print-file-name=" + *file )
+	if( len( found ) = 0 ) then
 		exit function
 	end if
-
-	input #ff, found
-
-	close ff
 
 	if( found = hStripPath( found ) ) then
 		exit function
@@ -356,8 +368,19 @@ sub fbcFindBin _
 		path = fbc.binpath + toolnames(tool) + FB_HOST_EXEEXT
 
 		#ifndef ENABLE_STANDALONE
+			if( (hFileExists( path ) = FALSE) and _
+			    (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC)) then
+				'' c) Ask GCC where it is, if applicable (GCC might have its
+				'' own copy which we must use instead of the system one)
+				if( tool = FBCTOOL_AS ) then
+					path = fbcQueryGcc( " -print-prog-name=as" )
+				elseif( tool = FBCTOOL_LD ) then
+					path = fbcQueryGcc( " -print-prog-name=ld" )
+				end if
+			end if
+
 			if( hFileExists( path ) = FALSE ) then
-				'' c) Rely on PATH
+				'' d) Rely on PATH
 				path = fbc.targetprefix + toolnames(tool) + FB_HOST_EXEEXT
 				relying_on_system = TRUE
 			end if
