@@ -25,6 +25,8 @@ type mbstate_t
 	__value as mbstate_t__value
 end type
 
+type wctype_t as unsigned long
+
 #ifndef WEOF
 #define WEOF &hfffffffful
 #endif

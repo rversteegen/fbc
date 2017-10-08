@@ -19,6 +19,7 @@
 
 type mbstate_t as long
 type _Wint_t as wchar_t
+type wctype_t as ushort
 
 #ifndef _fsize_t
 type _fsize_t as culong

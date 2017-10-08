@@ -60,6 +60,13 @@ declare function wcsstr (byval as const wchar_t ptr, byval as const wchar_t ptr)
 declare function wcstok (byval as wchar_t ptr, byval as const wchar_t ptr) as wchar_t ptr
 declare function wcsxfrm (byval as wchar_t ptr, byval as const wchar_t ptr, byval as size_t) as size_t
 
+#ifdef __FB_UNIX__
+declare function strcasecmp (byval as const zstring ptr, byval as const zstring ptr) as long
+declare function strncasecmp (byval as const zstring ptr, byval as const zstring ptr, byval n as size_t) as long
+declare function strdup (byval as const zstring ptr) as zstring ptr
+declare function strndup (byval as const zstring ptr, byval n as size_t) as zstring ptr
+#endif
+
 #ifdef __FB_WIN32__
 declare function _strerror (byval as const zstring ptr) as zstring ptr
 declare function _memccpy (byval as any ptr, byval as const any ptr, byval as long, byval as size_t) as any ptr
