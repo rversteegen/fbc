@@ -26,6 +26,8 @@ declare sub ppIncLib( )
 declare sub ppLibPath( )
 declare sub ppLine()
 declare sub ppLang()
+declare function ppSizeOf( ) as string
+
 
 '' globals
 	dim shared as PP_CTX pp
@@ -543,6 +545,10 @@ function ppReadLiteral _
 			DZstrConcatAssign( text, ppTypeOf( ) )
 			exit do
 
+	  	case FB_TK_SIZEOF
+			DZstrConcatAssign( text, ppSizeOf( ) )
+			exit do
+
     	end select
 
     	'' anything else..
@@ -728,5 +734,15 @@ function ppTypeOf( ) as string
 		hSkipUntil( CHAR_RPRNT )
 	else
 		lexSkipToken( )
+	end if
+end function
+
+function ppSizeOf( ) as string
+	fbSetIsPP( TRUE )
+	dim as ASTNODE ptr expr = cExpression( )
+	fbSetIsPP( FALSE )
+
+	if( expr <> NULL andalso astIsCONST( expr ) ) then
+		return astConstFlushToStr( expr )
 	end if
 end function
