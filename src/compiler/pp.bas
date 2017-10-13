@@ -245,6 +245,36 @@ sub ppParse( )
 	'' PRINT LITERAL*
 	case FB_TK_PP_PRINT
 		lexSkipToken( )
+
+/'
+		dim as string text
+		dim as ASTNODE ptr expr = any
+
+		fbSetIsPP( TRUE )
+		expr = cExpression( )
+		fbSetIsPP( FALSE )
+
+		' See ppExpression: need to check astGetStrLitSymbol(expr) or astIsCONST(expr)??
+
+		if( expr <> NULL ) then
+			dim as FBSYMBOL ptr sym = astGetSymbol( expr )
+?"got expr", sym
+			if( sym <> NULL andalso symbIsConst( sym ) ) then
+?"got const sym"
+				text = symbGetConstValueAsStr( sym )
+				astDelNode( expr )
+			elseif( astIsCONST( expr ) ) then
+				text = astConstFlushToStr( expr )
+			end if
+		end if
+
+		if( len(text) > 0 ) then
+			print "X", text
+		else
+			print "Y", *ppReadLiteral( )
+		end if
+'/
+
 		print *ppReadLiteral( )
 
 	'' ERROR LITERAL*
@@ -458,8 +488,15 @@ function ppReadLiteral _
 
     DZstrReset( text )
 
+'?"----literal---", FB_TK_SIZEOF
     do
+'?"tok", lexGetToken( LEXCHECK_KWDNAMESPC ) ,  lexGetToken (   		 (LEX_FLAGS or LEXCHECK_KWDNAMESPC) and _
+'										(not LEXCHECK_NOWHITESPC))
+
+'LEX_FLAGS )
     	select case as const lexGetToken( LEX_FLAGS )
+'    	select case as const lexGetToken (   		 (LEX_FLAGS or LEXCHECK_KWDNAMESPC) and _
+'										(not LEXCHECK_NOWHITESPC))
 		case FB_TK_EOF
 			if( ismultiline ) then
 				errReport( FB_ERRMSG_EXPECTEDMACRO )
@@ -552,13 +589,16 @@ function ppReadLiteral _
     	end select
 
     	'' anything else..
+'?"got", *lexGetText( )
     	if( lexGetType() <> FB_DATATYPE_WCHAR ) then
     		DZstrConcatAssign( text, lexGetText( ) )
     	else
     	    DZstrConcatAssignW( text, lexGetTextW( ) )
     	end if
 
-    	lexSkipToken( LEX_FLAGS )
+		lexSkipToken ( LEX_FLAGS )
+'  		 (LEX_FLAGS or LEXCHECK_KWDNAMESPC) and _
+'										(not LEXCHECK_NOWHITESPC))
 
     loop
 
@@ -606,7 +646,10 @@ function ppReadLiteralW _
     DWstrAllocate( text, 0 )
 
     do
-    	select case as const lexGetToken( LEX_FLAGS )
+    	select case as const lexGetToken ( LEX_FLAGS )
+'  		 (LEX_FLAGS or LEXCHECK_KWDNAMESPC) and _
+'										(not LEXCHECK_NOWHITESPC))
+'( LEX_FLAGS )
 		case FB_TK_EOF
 			if( ismultiline ) then
 				errReport( FB_ERRMSG_EXPECTEDMACRO )
@@ -700,6 +743,7 @@ function ppReadLiteralW _
     	else
     		DWstrConcatAssignA( text, lexGetText( ) )
     	end if
+
 
     	lexSkipToken( LEX_FLAGS )
 
