@@ -2265,7 +2265,13 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 	case EXPRCLASS_CAST
 		'' (type)l
 		ctx.exprtext += "(" + hEmitType( n->dtype, n->subtype ) + ")"
+		if( need_parens ) then
+			ctx.exprtext += "("
+		end if
 		hExprFlush( n->l, TRUE )
+		if( need_parens ) then
+			ctx.exprtext += ")"
+		end if
 
 	case EXPRCLASS_UOP
 		ctx.exprtext += *hUopToStr( n->op, n->dtype, is_builtin )
@@ -2273,14 +2279,14 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		'' Add parentheses around UOPs to avoid -(-(foo)) looking like
 		'' --foo which looks like the -- operator to gcc. Or, add the
 		'' parentheses for __builtin_* calls.
-		need_parens = (n->l->class = EXPRCLASS_UOP) or is_builtin
+		need_parens or= (n->l->class = EXPRCLASS_UOP) or is_builtin
 		if( need_parens ) then
 			ctx.exprtext += "("
 			if( is_builtin ) then
 				ctx.exprtext += " "
 			end if
 		end if
-		hExprFlush( n->l, TRUE )
+		hExprFlush( n->l, FALSE )
 		if( need_parens ) then
 			if( is_builtin ) then
 				ctx.exprtext += " "
