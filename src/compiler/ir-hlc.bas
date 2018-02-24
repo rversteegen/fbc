@@ -518,7 +518,7 @@ private function hEmitProcHeader _
 		byval options as EMITPROC_OPTIONS _
 	) as string
 
-	dim as string ln, mangled
+	dim as string ln, mangled, callingconv
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 
@@ -545,10 +545,10 @@ private function hEmitProcHeader _
 			select case( env.clopt.target )
 			case FB_COMPTARGET_WIN32, FB_COMPTARGET_XBOX
 				'' MinGW recognizes this shorter & prettier version
-				ln += " __stdcall"
+				callingconv = "__stdcall "
 			case else
 				'' Linux GCC only accepts this
-				ln += " __attribute__((stdcall))"
+				callingconv = "__attribute__((stdcall)) "
 			end select
 		end select
 	end if
@@ -559,11 +559,13 @@ private function hEmitProcHeader _
 
 	'' Identifier
 	if( options and EMITPROC_ISPROCPTR ) then
-		ln += "(*"
+		' GCC accepts the calling convention either inside or outside the
+		' brackets, Visual-C++ requires it inside
+		ln += "(" + callingconv + "*"
 		ln += mangled
 		ln += ")"
 	else
-		ln += mangled
+		ln += callingconv + mangled
 	end if
 
 	'' Parameter list
