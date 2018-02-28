@@ -105,6 +105,8 @@
 #include once "lex.bi"
 #include once "ir-private.bi"
 
+dim shared visualc as integer = 1
+
 '' The stack of nested sections allows us to go back and emit text to
 '' the headers of parent sections, while already working on emitting
 '' something else in an inner section.
@@ -434,19 +436,23 @@ private sub hAppendCtorAttrib _
 		if( in_front = FALSE ) then
 			ln += " "
 		end if
-		ln += "__attribute__(( "
-		if( proc->stats and FB_SYMBSTATS_GLOBALCTOR ) then
-			ln += "constructor"
+		if visualc then
+			
 		else
-			ln += "destructor"
-		end if
+			ln += "__attribute__(( "
+			if( proc->stats and FB_SYMBSTATS_GLOBALCTOR ) then
+				ln += "constructor"
+			else
+				ln += "destructor"
+			end if
 
-		priority = symbGetProcPriority( proc )
-		if( priority <> 0 ) then
-			ln += "( " + str( priority ) + " )"
-		end if
+			priority = symbGetProcPriority( proc )
+			if( priority <> 0 ) then
+				ln += "( " + str( priority ) + " )"
+			end if
 
-		ln += " ))"
+			ln += " ))"
+		end if
 		if( in_front ) then
 			ln += " "
 		end if
@@ -483,6 +489,10 @@ end function
 
 private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 	function = FALSE
+
+	if( visualc ) then
+		exit function  'TODO: NO idea!
+	end if
 
 	'' Only on systems where gcc would use the @N suffix
 	if( fbGetCpuFamily( ) <> FB_CPUFAMILY_X86 ) then
@@ -627,7 +637,7 @@ private function hEmitProcHeader _
 		if( hNeedAlias( proc ) ) then
 			ln += " asm(""" + hGetMangledNameForASM( proc, TRUE ) + """)"
 		end if
-
+'https://stackoverflow.com/questions/1113409/attribute-constructor-equivalent-in-vc
 		'' ctor/dtor flags on prototypes
 		hAppendCtorAttrib( ln, proc, FALSE )
 	end if
@@ -1029,7 +1039,8 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 				end if
 
 				if( skip = FALSE ) then
-					ln += " __attribute__((packed, aligned(" + str( align ) + ")))"
+					'TODO
+					'ln += " __attribute__((packed, aligned(" + str( align ) + ")))"
 				end if
 			end if
 
@@ -1102,7 +1113,7 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	'' stucts, which is the default under -mms-bitfields, which is on by
 	'' default in mingw32 gcc 4.7.
 	if( (env.clopt.target = FB_COMPTARGET_WIN32) and _
-	    (symbGetUDTAlign( s ) > 0) ) then
+	    (symbGetUDTAlign( s ) > 0) ) and ( visualc = FALSE ) then
 		ln += "__attribute__((gcc_struct)) "
 	end if
 
@@ -1188,7 +1199,13 @@ private sub hWriteGenericF2I _
 		callname = "nearbyint"
 	end if
 
-	hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")__builtin_" + callname + "( value ))", TRUE )
+	if( visualc ) then
+		'TODO
+		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")floor(( value ) + 0.5))", TRUE )
+
+	else
+		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")__builtin_" + callname + "( value ))", TRUE )
+	end if
 
 end sub
 
@@ -1200,7 +1217,7 @@ private sub hWriteF2I _
 	)
 
 	'' We have inline ASM routines for some cases
-	if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86 ) then
+	if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86 ) and ( visualc = FALSE ) then
 		select case( rtype )
 		case FB_DATATYPE_LONG, FB_DATATYPE_LONGINT
 			hWriteX86F2I( fname, rtype, ptype )
@@ -1272,6 +1289,33 @@ private function _emitBegin( ) as integer
 		hWriteLine( "typedef struct { char *data; int32 len; int32 size; } FBSTRING;", TRUE )
 	end if
 	hWriteLine( "typedef int8 boolean;", TRUE )
+
+	if( visualc ) then
+		' For memset/memcpy
+		hWriteLine( "#include <memory.h>", TRUE )
+		hWriteLine( "#include <math.h>", TRUE )
+
+		hWriteLine( "#define __builtin_sinf sinf", TRUE )
+		hWriteLine( "#define __builtin_asinf asinf", TRUE )
+		hWriteLine( "#define __builtin_cosf cosf", TRUE )
+		hWriteLine( "#define __builtin_acosf acosf", TRUE )
+		hWriteLine( "#define __builtin_tanf tanf", TRUE )
+		hWriteLine( "#define __builtin_atanf atanf", TRUE )
+		hWriteLine( "#define __builtin_sqrtf sqrtf", TRUE )
+		hWriteLine( "#define __builtin_logf logf", TRUE )
+		hWriteLine( "#define __builtin_expf expf", TRUE )
+		hWriteLine( "#define __builtin_floorf floorf", TRUE )
+		hWriteLine( "#define __builtin_sin sin", TRUE )
+		hWriteLine( "#define __builtin_asin asin", TRUE )
+		hWriteLine( "#define __builtin_cos cos", TRUE )
+		hWriteLine( "#define __builtin_acos acos", TRUE )
+		hWriteLine( "#define __builtin_tan tan", TRUE )
+		hWriteLine( "#define __builtin_atan atan", TRUE )
+		hWriteLine( "#define __builtin_sqrt sqrt", TRUE )
+		hWriteLine( "#define __builtin_log log", TRUE )
+		hWriteLine( "#define __builtin_exp exp", TRUE )
+		hWriteLine( "#define __builtin_floor floor", TRUE )
+	end if
 
 	'' body
 	sectionBegin( )
@@ -1391,6 +1435,20 @@ private function _supportsOp _
 		byval op as integer, _
 		byval dtype as integer _
 	) as integer
+
+	if visualc then
+/'
+		'Doesn't have __builtin_*
+		select case as const( op )
+		case AST_OP_SIN, AST_OP_ASIN, AST_OP_COS, AST_OP_ACOS, _
+		     AST_OP_TAN, AST_OP_ATAN, AST_OP_SQRT, AST_OP_LOG, _
+		     AST_OP_EXP, AST_OP_FLOOR, AST_OP_ABS, AST_OP_MEMCLEAR, _
+		     AST_OP_MEMMOVE
+			function = FALSE
+		end select
+'/
+	end if
+
 	'' Only these aren't available as either C ops or __builtin_*'s
 	select case as const( op )
 	case AST_OP_SGN, AST_OP_FIX, AST_OP_FRAC, AST_OP_RSQRT, AST_OP_RCP
@@ -1988,7 +2046,11 @@ private function hEmitFloat _
 	case &h7FF00000UL, &hFFF00000UL
 		if( dtype = FB_DATATYPE_DOUBLE ) then
 			if( expval and &h80000000ul ) then
-				s += "(-__builtin_inf())"
+				' if( visualc ) then
+				' 	s += "(-_fb_inf)"
+				' else
+					s += "(-__builtin_inf())"
+'				end if
 			else
 				s += "__builtin_inf()"
 			end if
@@ -2018,14 +2080,27 @@ private function hEmitFloat _
 
 	case else
 
-		'' Convert to exact representation using C99-compatible hex format
-		s = hFloatToHex_C99( value )
+		if visualc then
+			'' C89 only, hex not supported
 
-		'' float type suffix
-		if( dtype = FB_DATATYPE_SINGLE ) then
-			s += "f"
+			'' Singles and Doubles both given Double precision to prevent being mis-converted
+			s = str( value )
+
+			'' Append .0 if there is no dot or exponent yet,
+			'' to prevent gcc from treating it as int
+			'' (e.g. 1 -> 1.0, but 0.1 or 1e-100 can stay as-is)
+			if( instr( s, any "e." ) = 0 ) then
+				s += ".0"
+			end if
+		else
+			'' Convert to exact representation using C99-compatible hex format
+			s = hFloatToHex_C99( value )
+
+			'' float type suffix
+			if( dtype = FB_DATATYPE_SINGLE ) then
+				s += "f"
+			end if
 		end if
-
 	end select
 
 	function = s
@@ -2171,6 +2246,8 @@ private function hUopToStr _
 	case AST_OP_NOT    : function = @"~"
 
 	case AST_OP_ABS
+		'if visualc then assert( FALSE )
+
 		is_builtin = TRUE
 
 		select case as const( typeGetSizeType( dtype ) )
@@ -2185,6 +2262,10 @@ private function hUopToStr _
 		end select
 
 	case else
+		if visualc then
+			'assert( FALSE )
+		end if
+
 		is_builtin = TRUE
 
 		if( dtype = FB_DATATYPE_SINGLE ) then
@@ -2293,6 +2374,7 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 	case EXPRCLASS_BOP
 		select case( n->op )
 		case AST_OP_ATAN2
+			if( visualc ) then assert( FALSE )
 			if( n->dtype = FB_DATATYPE_SINGLE ) then
 				ctx.exprtext += "__builtin_atan2f"
 			else
@@ -3121,13 +3203,15 @@ private sub _emitMem _
 		byval bytes as longint _
 	)
 
+	dim pref as string
+	if( visualc = FALSE ) then pref = "__builtin_"
+
 	select case op
 	case AST_OP_MEMCLEAR
-		hWriteLine("__builtin_memset( " + exprFlush( exprNewVREG( v1 ) ) + ", 0, " + exprFlush( exprNewVREG( v2 ) ) + " );" )
+		hWriteLine(pref + "memset( " + exprFlush( exprNewVREG( v1 ) ) + ", 0, " + exprFlush( exprNewVREG( v2 ) ) + " );" )
 	case AST_OP_MEMMOVE
-		hWriteLine("__builtin_memcpy( " + exprFlush( exprNewVREG( v1 ) ) + ", " + exprFlush( exprNewVREG( v2 ) ) + ", " + str( cunsg( bytes ) ) + " );" )
+		hWriteLine(pref + "memcpy( " + exprFlush( exprNewVREG( v1 ) ) + ", " + exprFlush( exprNewVREG( v2 ) ) + ", " + str( cunsg( bytes ) ) + " );" )
 	end select
-
 end sub
 
 private sub _emitDECL( byval sym as FBSYMBOL ptr )

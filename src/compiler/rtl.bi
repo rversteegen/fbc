@@ -245,7 +245,6 @@
 #define FB_RTL_COLOR					"fb_Color"
 #define FB_RTL_PAGESET					"fb_PageSet"
 
-#define FB_RTL_MEMCOPY 					"fb_MemCopy"
 #define FB_RTL_MEMSWAP 					"fb_MemSwap"
 #define FB_RTL_MEMCOPYCLEAR 			"fb_MemCopyClear"
 
