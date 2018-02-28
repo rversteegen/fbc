@@ -1591,6 +1591,7 @@ function emitMEMMOVE _
 end function
 
 '':::::
+'' Not used, nor supported by C/LLVM backends
 function emitMEMSWAP _
 	( _
 		byval dvreg as IRVREG ptr, _

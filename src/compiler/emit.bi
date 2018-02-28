@@ -105,7 +105,7 @@ enum EMIT_NODEOP
 
 	'' mem
 	EMIT_OP_MEMMOVE
-	EMIT_OP_MEMSWAP
+	EMIT_OP_MEMSWAP   'Not used, nor supported by C/LLVM backends
 	EMIT_OP_MEMCLEAR
 	EMIT_OP_STKCLEAR
 

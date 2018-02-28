@@ -126,7 +126,7 @@ enum AST_OP
 	AST_OP_JUMPPTR
 
 	AST_OP_MEMMOVE
-	AST_OP_MEMSWAP
+	AST_OP_MEMSWAP   'Not used, nor supported by C/LLVM backends
 	AST_OP_MEMCLEAR
 	AST_OP_STKCLEAR
 

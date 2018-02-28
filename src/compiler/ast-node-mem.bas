@@ -41,6 +41,13 @@ function astNewMEM _
 		end if
 	end if
 
+	if( irGetOption( IR_OPT_MISSINGOPS ) ) then
+		'' Call RTL function if backend doesn't support this op directly
+		if( irSupportsOp( op, FB_DATATYPE_INVALID ) = FALSE ) then
+			return rtlMathUop( op, o )
+		end if
+	end if
+
 	'' alloc new node
 	n = astNewNode( AST_NODECLASS_MEM, FB_DATATYPE_INVALID )
 

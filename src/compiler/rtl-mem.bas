@@ -126,6 +126,23 @@
 				( FB_DATATYPE_UINT, FB_PARAMMODE_BYVAL, FALSE ) _
 	 		} _
 	 	), _
+		/' function memcpy cdecl _
+			( _
+				byref dst as any, _
+				byval value as long = 0, _
+				byval bytes as uinteger _
+			) as any ptr '/ _
+		/'( _
+			@"memcpy", NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			3, _
+			{ _
+				( FB_DATATYPE_VOID, FB_PARAMMODE_BYREF, FALSE ), _
+				( FB_DATATYPE_VOID, FB_PARAMMODE_BYREF, FALSE ), _
+				( FB_DATATYPE_UINT, FB_PARAMMODE_BYVAL, FALSE ) _
+	 		} _
+	 	),'/ _
 	 	/' EOL '/ _
 	 	( _
 	 		NULL _
@@ -258,6 +275,42 @@ function rtlMemCopyClear _
 
 end function
 
+/'
+'':::::
+function rtlMemcpy _
+	( _
+		byval dstexpr as ASTNODE ptr, _
+		byval srcexpr as ASTNODE ptr, _
+		byval srclen as longint _
+	) as integer
+
+	dim as ASTNODE ptr proc = any
+
+	function = FALSE
+
+	proc = astNewCALL( PROCLOOKUP( MEMCPY ) )
+
+	'' dst as any
+	if( astNewARG( proc, dstexpr ) = NULL ) then
+		exit function
+	end if
+
+	'' src as any
+	if( astNewARG( proc, srcexpr ) = NULL ) then
+		exit function
+	end if
+
+	'' byval srclen as integer
+	if( astNewARG( proc, astNewCONSTi( srclen ) ) = NULL ) then
+		exit function
+	end if
+
+	astAdd( proc )
+
+	function = TRUE
+end function
+'/
+
 function rtlMemNewOp _
 	( _
 		byval op as integer, _
@@ -335,3 +388,29 @@ function rtlMemDeleteOp _
 
 	function = proc
 end function
+
+/'
+'' RTL functions to implement OPs not directly supported by C/LLVM backends
+'' (for reference: irSupportsOp() implementations)
+function rtlMemOp _
+	( _
+		byval op as integer, _
+		byval lexpr as ASTNODE ptr, _
+		byval rexpr as ASTNODE ptr _
+	) as ASTNODE ptr
+
+	dim as FBSYMBOL ptr sym = any
+
+	select case as const( op )
+	case AST_OP_MEMCLEAR
+		sym = PROCLOOKUP( MEMSET )  '' C (Visual C only)
+	case AST_OP_MEMMOVE
+		sym = PROCLOOKUP( MEMCPY )  '' C (Visual C only)
+	case else
+		assert( FALSE )
+		exit function
+	end select
+
+	function = rtlOvlProcCall( sym, lexpr, rexpr )
+end function
+'/
