@@ -1,0 +1,58 @@
+fbcunit TODO/BUG list:
+
+[ ] write a (short) manual on the library's API
+
+[ ] add unit tests (for fbcunit itself) for all CU_* macros
+
+[ ] for compatibility with existing fbc compiler suite,
+	can't check the return value of init & cleanup code
+	because fbc test suite doesn't set it.
+
+	1) remove the check, and let user decide how to deal with
+		failed init & cleanup code - i.e. CU_ASSERT_FATAL( false )
+
+	OR 2) default to success and let user set a FAIL flag
+
+	OR 3) update fbc test suites
+
+	For either #2 or #3 still todo:
+	SUITE_INIT and SUITE_CLEANUP need to set the function 
+	return value.  Consider	adding a macro to set the value.
+
+	Current	work around for qb is:
+
+	SUITE( somename )
+		SUITE_INIT
+			somename.init = true
+		END_SUITE_INIT
+		SUITE_CLEANUP
+			somename.cleanup = true
+		END_SUITE_CLEANUP
+	END_SUITE
+
+
+	Current	work around for fb, fblite is:
+
+	SUITE( somename )
+		SUITE_INIT
+			function = true
+		END_SUITE_INIT
+		SUITE_CLEANUP
+			function = true
+		END_SUITE_CLEANUP
+	END_SUITE
+
+[ ] allowing adding flags to individual tests, especially:
+	TEST_SET_CONSOLE(1) - indicate that test generates console output
+	TEST_SET_INTERACTIVE(1) - indicates test is interactive
+
+[ ] add_suite() might be called with same name as a suite already
+	added but with different init/cleanup procs.  fbcunit framework
+	should maintain a list of init/cleanup procs instead of just one
+
+[ ] SUITE() can be used in more than one module with the same name,
+	that's OK, however, the constructor might be duplicated at the
+	END_SUITE - It uses the __LINE__ built-in to generate unique 
+	identifiers.  This falls apart however,	when END_SUITE is used 
+	for the same suite, in multiple files and happens to land on the 
+	exact same line number.

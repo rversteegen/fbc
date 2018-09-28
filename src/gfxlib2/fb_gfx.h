@@ -64,6 +64,11 @@
 #define DEFAULT_COLOR_2			0x40000000
 #define VIEW_SCREEN				0x00000001
 
+#define DRIVER_OGL_2D_NONE          0
+#define DRIVER_OGL_2D_MANUAL_SYNC   1
+#define DRIVER_OGL_2D_AUTO_SYNC     2
+
+
 #define LINE_TYPE_LINE		0
 #define LINE_TYPE_B		1
 #define LINE_TYPE_BF		2
@@ -148,6 +153,8 @@
 #define SET_GL_ACCUM_BLUE_BITS		115
 #define SET_GL_ACCUM_ALPHA_BITS		116
 #define SET_GL_NUM_SAMPLES			117
+#define SET_GL_2D_MODE				150
+#define SET_GL_SCALE				151
 
 #define POLL_EVENTS					200
 
@@ -462,6 +469,7 @@ extern void fb_hSoftCursorPaletteChanged(void);
 extern int fb_hColorDistance(int index, int r, int g, int b);
 extern void *fb_hPixelSetAlpha4(void *dest, int color, size_t size);
 extern ssize_t fb_hGetWindowHandle(void);
+extern ssize_t fb_hGetDisplayHandle(void);
 
 
 /* Public API */

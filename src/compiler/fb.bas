@@ -470,13 +470,14 @@ sub fbGlobalInit()
 	env.clopt.lang          = FB_DEFAULT_LANG
 	env.clopt.forcelang     = FALSE
 
-	env.clopt.debug         = FALSE
+	env.clopt.debuginfo     = FALSE
+	env.clopt.assertions    = FALSE
 	env.clopt.errorcheck    = FALSE
 	env.clopt.extraerrchk   = FALSE
 	env.clopt.resumeerr     = FALSE
 	env.clopt.profile       = FALSE
 
-	env.clopt.warninglevel  = 0
+	env.clopt.warninglevel  = FB_WARNINGMSGS_DEFAULT_LEVEL
 	env.clopt.showerror     = TRUE
 	env.clopt.maxerrors     = FB_DEFAULT_MAXERRORS
 	env.clopt.pdcheckopt    = FB_PDCHECK_NONE
@@ -490,6 +491,7 @@ sub fbGlobalInit()
 	env.clopt.stacksize     = FB_DEFSTACKSIZE
 	env.clopt.objinfo       = TRUE
 	env.clopt.showincludes  = FALSE
+	env.clopt.modeview      = FB_DEFAULT_MODEVIEW
 
 	hUpdateLangOptions( )
 	hUpdateTargetOptions( )
@@ -538,8 +540,10 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 	case FB_COMPOPT_FORCELANG
 		env.clopt.forcelang = value
 
-	case FB_COMPOPT_DEBUG
-		env.clopt.debug = value
+	case FB_COMPOPT_DEBUGINFO
+		env.clopt.debuginfo = value
+	case FB_COMPOPT_ASSERTIONS
+		env.clopt.assertions = value
 	case FB_COMPOPT_ERRORCHECK
 		env.clopt.errorcheck = value
 	case FB_COMPOPT_RESUMEERROR
@@ -579,6 +583,8 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 		env.clopt.objinfo = value
 	case FB_COMPOPT_SHOWINCLUDES
 		env.clopt.showincludes = value
+	case FB_COMPOPT_MODEVIEW
+		env.clopt.modeview = value
 	end select
 end sub
 
@@ -611,8 +617,10 @@ function fbGetOption( byval opt as integer ) as integer
 	case FB_COMPOPT_FORCELANG
 		function = env.clopt.forcelang
 
-	case FB_COMPOPT_DEBUG
-		function = env.clopt.debug
+	case FB_COMPOPT_DEBUGINFO
+		function = env.clopt.debuginfo
+	case FB_COMPOPT_ASSERTIONS
+		function = env.clopt.assertions
 	case FB_COMPOPT_ERRORCHECK
 		function = env.clopt.errorcheck
 	case FB_COMPOPT_RESUMEERROR
@@ -649,6 +657,8 @@ function fbGetOption( byval opt as integer ) as integer
 		function = env.clopt.objinfo
 	case FB_COMPOPT_SHOWINCLUDES
 		function = env.clopt.showincludes
+	case FB_COMPOPT_MODEVIEW
+		function = env.clopt.modeview
 
 	case else
 		function = 0

@@ -52,7 +52,7 @@ declare function hMakeParamDesc _
 		( 1, @"Identifier's name too big, truncated" ), _
 		( 1, @"Literal number too big, truncated" ), _
 		( 1, @"Literal string too big, truncated" ), _
-		( 0, @"UDT with pointer or var-len string fields" ), _
+		( 0, @"UDT with pointer, var-len string, or var-len array fields" ), _
 		( 0, @"Implicit variable allocation" ), _
 		( 0, @"Missing closing quote in literal string" ), _
 		( 0, @"Function result was not explicitly set" ), _
@@ -81,7 +81,11 @@ declare function hMakeParamDesc _
 		( 0, @"Mismatching parameter initializer" ), _
 		( 1, @"" ), _  '' FB_WARNINGMSG_AMBIGIOUSLENSIZEOF
 		( 0, @"Suspicious logic operation, mixed boolean and non-boolean operands" ), _
-		( 0, @"Redefinition of intrinsic" ) _
+		( 0, @"Redefinition of intrinsic" ), _
+		(-1, @"CONST qualifier discarded" ), _
+		(-1, @"Return type mismatch" ), _
+		(-1, @"Calling convention mismatch" ), _
+		(-1, @"Argument count mismatch" ) _
 	}
 
 	dim shared errorMsgs( 1 to FB_ERRMSGS-1 ) as const zstring ptr => _
@@ -125,7 +129,8 @@ declare function hMakeParamDesc _
 		@"Array boundaries do not match the original EXTERN declaration", _
 		@"'SUB' or 'FUNCTION' without 'END SUB' or 'END FUNCTION'", _
 		@"Expected 'END SUB' or 'END FUNCTION'", _
-		@"Illegal parameter specification", _
+		@"Return type here does not match DECLARE prototype", _
+		@"Calling convention does not match DECLARE prototype", _
 		@"Variable not declared", _
 		@"Variable required", _
 		@"Illegal outside a compound statement", _
@@ -398,7 +403,7 @@ declare function hMakeParamDesc _
 		@"#ASSERT condition failed", _
 		@"Expected '>'", _
 		@"Invalid size", _
-		@"ALIAS name here is different from ALIAS given in DECLARE prototype", _
+		@"ALIAS name here does not match ALIAS given in DECLARE prototype", _
 		@"vararg parameters are only allowed in CDECL procedures", _
 		@"the first parameter in a procedure may not be vararg", _
 		@"CONST used on constructor (not needed)", _

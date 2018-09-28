@@ -167,12 +167,13 @@ type AST_NODE_JMPTB
 	labelcount			as integer
 
 	deflabel			as FBSYMBOL ptr
-	minval				as ulongint
-	maxval				as ulongint
+	bias				as ulongint
+	span				as ulongint
 end type
 
 type AST_NODE_DBG
 	ex				as integer
+	filename		as zstring ptr
 	op				as integer
 end type
 
@@ -244,8 +245,9 @@ type AST_NODE_LINK
 end type
 
 type AST_NODE_CAST
-	doconv 			as integer						'' do conversion (TRUE or FALSE)
-	do_convfd2fs		as integer  '' whether or not to ensure truncation in double2single conversions
+	doconv 			as integer	'' do conversion (TRUE or FALSE)
+	do_convfd2fs	as integer  '' whether or not to ensure truncation in double2single conversions
+	convconst		as integer	'' const qualifier bits discarded/changed in the conversion (TRUE or FALSE)
 end type
 
 ''
@@ -529,6 +531,8 @@ enum AST_CONVOPT
 	AST_CONVOPT_CHECKSTR = &h2
 	AST_CONVOPT_PTRONLY  = &h4
 	AST_CONVOPT_DONTCHKPTR = &h8
+	AST_CONVOPT_DONTWARNCONST = &h10
+	AST_CONVOPT_DONTWARNFUNCPTR = &h20
 end enum
 
 declare function astNewCONV _
@@ -731,8 +735,8 @@ declare function astBuildJMPTB _
 		byval labels1 as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	) as ASTNODE ptr
 
 declare function astNewLOOP _
@@ -791,7 +795,8 @@ declare function astNewASM( byval asmtokhead as ASTASMTOK ptr ) as ASTNODE ptr
 declare function astNewDBG _
 	( _
 		byval op as integer, _
-		byval ex as integer = 0 _
+		byval ex as integer = 0, _
+		byval filename as zstring ptr = 0 _
 	) as ASTNODE ptr
 
 declare function astNewMEM _
@@ -1169,6 +1174,25 @@ declare function astBuildDtorCall _
 		byval ignore_virtual as integer = FALSE _
 	) as ASTNODE ptr
 
+declare function astBuildWhileCounterBegin _
+	( _
+		byval tree as ASTNODE ptr, _
+		byval cnt as FBSYMBOL ptr, _
+		byval label as FBSYMBOL ptr, _
+		byval exitlabel as FBSYMBOL ptr, _
+		byval initexpr as ASTNODE ptr, _
+		byval flush_label as integer = TRUE _
+	) as ASTNODE ptr
+
+declare function astBuildWhileCounterEnd _
+	( _
+		byval tree as ASTNODE ptr, _
+		byval cnt as FBSYMBOL ptr, _
+		byval label as FBSYMBOL ptr, _
+		byval exitlabel as FBSYMBOL ptr, _
+		byval flush_label as integer = TRUE _
+	) as ASTNODE ptr
+
 declare function astBuildForBegin _
 	( _
 		byval tree as ASTNODE ptr, _
@@ -1467,7 +1491,7 @@ extern ast as ASTCTX
 
 extern ast_opTB( 0 to AST_OPCODES-1 ) as AST_OPINFO
 
-declare function astDumpOp( byval op as AST_OP ) as string
+declare function astDumpOpToStr( byval op as AST_OP ) as string
 
 declare sub astDumpTree _
 	( _

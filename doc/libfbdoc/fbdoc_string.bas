@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2018 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -68,44 +68,46 @@ namespace fb.fbdoc
 	end function
 
 	'':::::
-	Function ReplaceQuotes(byref a as string, byref q as string) As String
-	  Dim b As String, bOK As integer
-	  If Len(a) >= 2 Then
-		If Left(a, 1) = """" And Right(a, 1) = """" Then
-		  bOK = True
-		ElseIf Left(a, 1) = "'" And Right(a, 1) = "'" Then
-		  bOK = True
-		ElseIf Left(a, 1) = "`" And Right(a, 1) = "'" Then
-		  bOK = True
-		End If
-		If bOK Then
-		  b = Mid(a, 2, Len(a) - 2)
-		Else
-		  b = a
-		End If
-	  Else
-		b = a
-	  End If
-  
-	  Select Case Left(q, 1)
-	  Case ""
-	  Case """"
-		b = """" & b & """"
-	  Case "'"
-		b = "'" & b & "'"
-	  Case "`"
-		b = "`" & b & "'"
-	  Case Else
-		b = Left(q, 1) & b & Left(q, 1)
-	  End Select
-  
-	  ReplaceQuotes = b
-	End Function
+	function ReplaceQuotes(byref a as string, byref q as string) As String
+
+		dim b as string, bOK as integer
+		if len(a) >= 2 then
+			if left(a, 1) = """" and right(a, 1) = """" then
+				bok = true
+			elseif left(a, 1) = "'" and right(a, 1) = "'" then
+				bok = true
+			elseif left(a, 1) = "`" and right(a, 1) = "'" then
+				bok = true
+			end if
+			if bok then
+				b = mid(a, 2, len(a) - 2)
+			else
+				b = a
+			end if
+		else
+			b = a
+		end if
+
+		select case left(q, 1)
+		case ""
+		case """"
+			b = """" & b & """"
+		case "'"
+			b = "'" & b & "'"
+		case "`"
+			b = "`" & b & "'"
+		case else
+			b = left(q, 1) & b & right(q, 1)
+		end select
+
+		replacequotes = b
+
+	end function
 
 	'':::::
-	Function StripQuotes (byref a As String) As String
-	  return ReplaceQuotes(a, "")
-	End Function
+	function StripQuotes (byref a As String) As String
+		return ReplaceQuotes(a, "")
+	end function
 
 	'':::::
 	function LoadFileAsString _
@@ -142,7 +144,7 @@ namespace fb.fbdoc
 
 				return sData
 		
-			end if	
+			end if
 
 		end if
 
@@ -156,28 +158,24 @@ namespace fb.fbdoc
 	end function
 
 	'':::::
-	function CellUnescapeCodes _
+	function UnescapeHtml _
 		( _
 			byref celltext as const string _
 		) as string
 
 		'' Unescape HTML-like codes (eg &amp, &#...) which may be
-		'' found in {{table}} blocks.  Note the lack of ';' terminator.
+		'' found in {{table}} blocks.  Note that the ';' terminator is optional for backward compatibility.
+		dim as string HtmlCodes(0 to ...) = { "amp", "&", "quot", """", "lt", "<", "gt", ">" }
 
-		dim i as integer = 1, ret as string 
+		dim i as integer = 1, ret as string
+		dim j as integer
 		ret = celltext
 		do
 
 			i = instr(i, ret, "&") 
 			if i = 0 then exit do
 
-			if( mid( ret, i + 1, 3 ) = "amp" ) then
-				ret = left(ret, i - 1) + "&" + mid(ret, i + 3 + 1) 
-				i += 3
-			elseif( mid( ret, i + 1, 4 ) = "quot" ) then
-				ret = left(ret, i - 1) + """" + mid(ret, i + 4 + 1) 
-				i += 4
-			elseif( asc( ret , i + 1 ) = asc( "#" ) ) then
+			if( asc( ret , i + 1 ) = asc( "#" ) ) then
 				dim as integer j = i + 2
 				dim as integer c = 0
 				do
@@ -190,9 +188,19 @@ namespace fb.fbdoc
 					j += 1
 				loop
 				if( c > 0 and c <= 255 ) then
+					if( mid( ret, j, 1) = ";" ) then j += 1
 					ret = left(ret, i - 1) + chr(c) + mid(ret, j)
 				end if
-				i = j - 1
+			else
+				for q as integer = 0 to ubound(HtmlCodes) step 2
+					if( mid( ret, i + 1, len( HtmlCodes(q) )) = HtmlCodes(q) ) then
+						j = i + len( HtmlCodes(q) ) + 1
+						if( mid( ret, j, 1) = ";" ) then j += 1
+						ret = left(ret, i - 1) + HtmlCodes(q+1) + mid(ret, j)
+						i += len( HtmlCodes(q+1) ) - 1
+						exit for
+					end if
+				next
 			end if
 
 			i += 1
@@ -217,6 +225,7 @@ namespace fb.fbdoc
 		dim as string res
 		dim as integer i
 		dim as integer lastcr
+		dim as string HtmlCodes(0 to ...) = { "amp", "&", "quot", """", "lt", "<", "gt", ">" }
 
 		res = ""
 		lastcr = FALSE
@@ -229,12 +238,6 @@ namespace fb.fbdoc
 				else
 					res += mid( text, i, 1)
 				end if
-			case "<"
-				res += "&lt;"
-			case ">"
-				res += "&gt;"
-			case "&"
-				res += "&amp;"
 			case chr(13)
 				if( br ) then
 					res += "<br />"
@@ -249,6 +252,12 @@ namespace fb.fbdoc
 				end if
 				res += mid( text, i, 1)
 			case else
+				for q as integer = 1 to ubound(HtmlCodes) step 2
+					if( mid( text, i, 1) = HtmlCodes(q) ) then
+						res += "&" + HtmlCodes(q-1) + ";"
+						exit select
+					end if
+				next
 				res += mid( text, i, 1)
 			end select
 

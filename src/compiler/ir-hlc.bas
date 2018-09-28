@@ -223,7 +223,8 @@ declare sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr = 0 _
 	)
 
 declare sub exprFreeNode( byval n as EXPRNODE ptr )
@@ -384,7 +385,7 @@ end sub
 private sub hWriteLine( byref s as string, byval noline as integer = FALSE )
 	static as string ln
 
-	if( env.clopt.debug and (noline = FALSE) ) then
+	if( env.clopt.debuginfo and (noline = FALSE) ) then
 		ln = "#line " + str( ctx.linenum )
 		ln += " """ + ctx.escapedinputfilename + """"
 		sectionWriteLine( ln )
@@ -504,11 +505,13 @@ private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 		function = TRUE
 
 	'' For stdcall with @N suffix, if the function has a hidden UDT result
-	'' pointer parameter, we need the alias to get the correct @N suffix.
-	'' (gcc would calculate the parameter into the @N suffix, since it
-	'' doesn't know that the parameter is the special result parameter)
+	'' pointer parameter, or UDT's passed byval, we need the alias to get
+	'' the correct @N suffix. (gcc could calculate the wrong value into the
+	'' @N suffix, since it doesn't known about the special result parameter
+	'' or byval UDTs).  It should be safe to always generate the alias
+	'' ourselves since we already must control for the special cases.
 	case FB_FUNCMODE_STDCALL
-		function = symbProcReturnsOnStack( proc )
+		function = TRUE
 	end select
 end function
 
@@ -674,6 +677,11 @@ private sub hEmitUDT( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 		'' see main's locals from elsewhere)
 		if( symbGetScope( s ) = FB_MAINSCOPE ) then
 			section += 1
+
+		'' global namespace due the implicit MAIN?
+		elseif( symbGetNamespace( s ) = @symbGetGlobalNamespc( ) ) then
+			section += 1
+
 		end if
 
 		'' Switching from a parent to a child scope isn't allowed,
@@ -1252,7 +1260,7 @@ private function _emitBegin( ) as integer
 	'' header
 	sectionBegin( )
 
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		_emitDBG( AST_OP_DBG_LINEINI, NULL, 0 )
 	end if
 
@@ -2361,7 +2369,7 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	}
 
 	s += *names(n->class)
-	s += typeDump( n->dtype, n->subtype )
+	s += typeDumpToStr( n->dtype, n->subtype )
 	s += " "
 
 	select case as const( n->class )
@@ -3046,8 +3054,8 @@ private sub _emitJmpTb _
 		byval labels as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 	dim as string tb, temp, ln
@@ -3071,50 +3079,44 @@ private sub _emitJmpTb _
 
 	tb = *symbUniqueId( )
 
-	l = exprNewIMMi( maxval - minval + 1 )
+	l = exprNewIMMi( span + 1 )
 	hWriteLine( "static const void* " + tb + "[" + exprFlush( l ) + "] = {", TRUE )
 	sectionIndent( )
 
-	if( minval <= maxval ) then
-		var i = 0
-		var value = minval
-		do
-			assert( i < labelcount )
+	var i = 0
+	var value = 0
+	do
+		assert( i < labelcount )
 
-			dim as FBSYMBOL ptr label
-			if( value = values[i] ) then
-				label = labels[i]
-				i += 1
-			else
-				label = deflabel
-			end if
-			hWriteLine( "&&" + *symbGetMangledName( label ) + ",", TRUE )
+		dim as FBSYMBOL ptr label
+		if( value = values[i] ) then
+			label = labels[i]
+			i += 1
+		else
+			label = deflabel
+		end if
+		hWriteLine( "&&" + *symbGetMangledName( label ) + ",", TRUE )
 
-			if( value = maxval ) then
-				exit do
-			end if
-			value += 1
-		loop
-	end if
+		if( value = span ) then
+			exit do
+		end if
+		value += 1
+	loop
 
 	sectionUnindent( )
 	hWriteLine( "};", TRUE )
 
-	if( minval > 0 ) then
-		'' if( temp < minval ) goto deflabel
-		l = exprNewTEXT( dtype, NULL, temp )
-		l = exprNewBOP( AST_OP_LT, l, exprNewIMMi( minval, dtype ) )
-		hWriteLine( "if( " + exprFlush( l ) + " ) goto " + *symbGetMangledName( deflabel ) + ";", TRUE )
-	end if
-
-	'' if( temp > maxval ) then goto deflabel
+	'' if( (temp-bias) > span ) then goto deflabel
 	l = exprNewTEXT( dtype, NULL, temp )
-	l = exprNewBOP( AST_OP_GT, l, exprNewIMMi( maxval, dtype ) )
+	if( bias <> 0 ) then
+		l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( bias, dtype ) )
+	end if
+	l = exprNewBOP( AST_OP_GT, l, exprNewIMMi( span, dtype ) )
 	hWriteLine( "if( " + exprFlush( l ) + " ) goto " + *symbGetMangledName( deflabel ) + ";", TRUE )
 
-	'' l = jumptable[l - minval]
+	'' l = jumptable[l - bias]
 	l = exprNewTEXT( dtype, NULL, temp )
-	l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( minval, dtype ) )
+	l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( bias, dtype ) )
 	hWriteLine( "goto *" + tb + "[" + exprFlush( l ) + "];", TRUE )
 
 end sub
@@ -3167,11 +3169,15 @@ private sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr _
 	)
 
 	if( op = AST_OP_DBG_LINEINI ) then
-		ctx.linenum = ex
+		ctx.linenum = lnum
+		if( filename <> NULL ) then
+			hUpdateCurrentFileName( filename )
+		end if
 	end if
 
 end sub
@@ -3297,12 +3303,15 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 
 		select case( n->type )
 		case AST_ASMTOK_TEXT
+			'' -asm intel: ASM keywords, string literals, constants, etc.
+			'' -asm att: String literals containing the ASM, tokens for the constraints lists, etc.
+			'' Symbol references in the asm strings for -asm att must use the ASM name already,
+			'' since we don't parse the string literal content.
 			asmcode += *n->text
 
 		case AST_ASMTOK_SYMB
-			if( sectionInsideProc( ) ) then
-				var id = symbGetMangledName( n->sym )
-				if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+			if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+				if( sectionInsideProc( ) ) then
 					select case( n->sym->class )
 					case FB_SYMBCLASS_VAR
 						'' Referencing a variable: insert %N place-holder...
@@ -3320,13 +3329,13 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 							if( len( inputconstraints ) > 0 ) then
 								inputconstraints  += ", "
 							end if
-							inputconstraints  +=  """m"" (" + *id + ")"
+							inputconstraints  +=  """m"" (" + *symbGetMangledName( n->sym ) + ")"
 						else
 							'' read+write output operand constraint: "+m" (symbol)
 							if( len( outputconstraints ) > 0 ) then
 								outputconstraints += ", "
 							end if
-							outputconstraints += """+m"" (" + *id + ")"
+							outputconstraints += """+m"" (" + *symbGetMangledName( n->sym ) + ")"
 						end if
 
 					case FB_SYMBCLASS_LABEL
@@ -3339,20 +3348,25 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 						if( len( labellist ) > 0 ) then
 							labellist += ", "
 						end if
-						labellist += *id
+						labellist += *symbGetMangledName( n->sym )
 
 					case else
-						'' Referencing a procedure: emit as-is, no gcc constraints needed
-						asmcode += *id
+						'' Referencing a procedure: no gcc constraints needed;
+						'' instead emit the symbol directly with its ASM name.
+						asmcode += hGetMangledNameForASM( n->sym, TRUE )
 					end select
 				else
-					'' -asm att: Expecting FB inline asm to be in gcc's format already,
-					'' emit everything as-is.
-					asmcode += *id
+					'' Inside NAKED procedure: Currently emitted as pure inline asm,
+					'' so constraints are (hopefully!?) not needed.
+					asmcode += hGetMangledNameForASM( n->sym, TRUE )
 				end if
 			else
-				'' In NAKED procedure
-				asmcode += hGetMangledNameForASM( n->sym, TRUE )
+				'' -asm att: Since the FB inline asm is in gcc's format already,
+				'' AST_ASMTOK_SYMB can only appear for symbol tokens in the constraints list,
+				'' for which we must emit the symbol with its C name.
+				'' FIXME: AST_ASMTOK_SYMB (reference to C symbol) can't be supported inside NAKED procedures currently,
+				'' because they are emitted as pure inline asm (string literals).
+				asmcode += *symbGetMangledName( n->sym )
 			end if
 
 		end select
@@ -3669,7 +3683,7 @@ private sub _emitProcBegin _
 
 	hWriteLine( "", TRUE )
 
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		_emitDBG( AST_OP_DBG_LINEINI, proc, proc->proc.ext->dbg.iniline )
 	end if
 

@@ -59,7 +59,7 @@
 #   bindist    Create binary FB release packages from current build directory content
 #   mingw-libs Standalone: Copy libraries from MinGW toolchain into lib/win32/ etc.
 #
-#   cunit-tests  (Convenience wrappers around tests/Makefile, running the tests
+#   unit-tests   (Convenience wrappers around tests/Makefile, running the tests
 #   log-tests     using the newly built fbc)
 #   warning-tests
 #   clean-tests
@@ -267,7 +267,6 @@ endif
 ifeq ($(TARGET_OS),dos)
   FBNAME := freebas$(ENABLE_SUFFIX)
   FB_LDSCRIPT := i386go32.x
-  DISABLE_MT := YesPlease
 else
   FBNAME := freebasic$(ENABLE_SUFFIX)
   FB_LDSCRIPT := fbextra.x
@@ -588,7 +587,14 @@ $(LIBFBPIC_C): $(libfbpicobjdir)/%.o: %.c $(LIBFB_H) | $(libfbpicobjdir)
 	$(QUIET_CC)$(CC) -fPIC $(ALLCFLAGS) -c $< -o $@
 
 $(libdir)/libfbmt.a: $(LIBFBMT_C) $(LIBFBMT_S) | $(libdir)
+ifeq ($(TARGET_OS),dos)
+  # Avoid hitting the command line length limit (the libfb.a ar command line
+  # is very long...)
+	$(QUIET)rm -f $@
+	$(QUIET_AR)$(AR) rcs $@ $(libfbmtobjdir)/*.o
+else
 	$(QUIET_AR)rm -f $@; $(AR) rcs $@ $^
+endif
 $(LIBFBMT_C): $(libfbmtobjdir)/%.o: %.c $(LIBFB_H) | $(libfbmtobjdir)
 	$(QUIET_CC)$(CC) -DENABLE_MT $(ALLCFLAGS) -c $< -o $@
 $(LIBFBMT_S): $(libfbmtobjdir)/%.o: %.s $(LIBFB_H) | $(libfbmtobjdir)
@@ -705,10 +711,10 @@ help:
 
 ################################################################################
 
-.PHONY: cunit-tests log-tests clean-tests
+.PHONY: unit-tests log-tests clean-tests
 
-cunit-tests:
-	cd tests && make cunit-tests FBC="`pwd`/../$(FBC_EXE) -i `pwd`/../inc"
+unit-tests:
+	cd tests && make unit-tests FBC="`pwd`/../$(FBC_EXE) -i `pwd`/../inc"
 
 log-tests:
 	cd tests && make   log-tests FBC="`pwd`/../$(FBC_EXE) -i `pwd`/../inc"

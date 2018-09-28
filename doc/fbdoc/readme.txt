@@ -1,6 +1,6 @@
 
   fbdoc - FreeBASIC User's Manual Converter/Generator
-  Copyright (C) 2006-2008 The FreeBASIC development team.
+  Copyright (C) 2006-2018 The FreeBASIC development team.
 
 License:
 
@@ -21,7 +21,7 @@ License:
 Purpose of fbdoc:
 
   The main purpose of fbdoc is for the conversion and generation of the 
-  FreeBASIC manual from http://www.freebasic.net/wiki to other formats.
+  FreeBASIC manual from https://www.freebasic.net/wiki to other formats.
   Secondary to this purpose is the creation of tools that will help
   maintain or format the wakka script located online.
 
@@ -36,10 +36,8 @@ Purpose of fbdoc:
   change in future, but for now, the focus is on supporting the maintenance
   conversion and generation of the FreeBASIC manuaul.
 
-  There will likely never be a binary distribution of fbdoc until FreeBASIC
-  is very mature. Currently not only do the fbdoc sources change often, but 
-  also the on-line wakka source script.  So there's no guarantee that older 
-  versions of the doc converter will work correctly with newer versions of 
+  There will likely never be a binary distribution of fbdoc. It is built 
+  from sources.  The doc converter is modified as needed to build the
   the on-line docs.
 
   Finally, aside from the FreeBASIC compiler itself, fbdoc serves as a test
@@ -57,12 +55,13 @@ Compiling:
 
   o Requirements:
 
-    - FreeBASIC Compiler version 0.17 or greater and compatible build 
+    - FreeBASIC Compiler version 1.04.0 or greater and compatible build 
       environment.
     - Windows or Linux OS (DOS not supported)
     - pcre
     - libcurl
-    - internet connection ( optional, to download wiki pages not in SVN )
+    - internet connection ( optional, to download wiki pages not in git
+	  repository )
     - make
 
 
@@ -75,10 +74,10 @@ Running:
     - In the directory where fbdoc executable was made, type "fbdoc -makeini"
       and this will create a default "fbdoc.ini".  Edit the file to configure
       connection settings.  However, this step is not required if building
-      from SVN only.
+      from git repository only.
 
 
-  o Building the CHM from SVN:
+  o Building the CHM from Git Repository:
 
     - In the directory where fbdoc executable was made, 
       type "fbdoc -usecache -chm"
@@ -142,15 +141,13 @@ Credits:
 
 Links:
 
-  o Official site: http://www.freebasic.net/ or
-                   http://fbc.sourceforge.net/ or
-                   http://www.sourceforge.net/projects/fbc
+  o Official site: https://www.freebasic.net/
 
   o External libraries:
 
-    - Curl: http://curl.haxx.se/
+    - Curl: https://curl.haxx.se/
 
-    - MySQL: http://dev.mysql.com/
+    - MySQL: https://dev.mysql.com/
 
     - PCRE: http://www.pcre.org/
     

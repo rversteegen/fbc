@@ -3,11 +3,11 @@
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
 ''
-'' See Also: http://www.freebasic.net/wiki/wikka.php?wakka=ExtLibcairo
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibcairo
 '' --------
 
 '' Example showing cairo being used to draw into the FB graphics window
-#include once "cairo/cairo.bi"
+#include Once "cairo/cairo.bi"
 
 Const SCREEN_W = 400
 Const SCREEN_H = 300
@@ -15,7 +15,7 @@ Const SCREEN_H = 300
 ScreenRes SCREEN_W, SCREEN_H, 32
 
 '' Create a cairo drawing context, using the FB screen as surface.
-Var surface = cairo_image_surface_create_for_data(ScreenPtr(), CAIRO_FORMAT_ARGB32, SCREEN_W, SCREEN_H, SCREEN_W * SizeOf(Integer))
+Var surface = cairo_image_surface_create_for_data(ScreenPtr(), CAIRO_FORMAT_ARGB32, SCREEN_W, SCREEN_H, SCREEN_W * SizeOf(ULong))
 
 Var c = cairo_create(surface)
 

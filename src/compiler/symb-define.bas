@@ -86,6 +86,10 @@ private function hDefOptGosub_cb ( ) as string
 	function = str( env.opt.gosub = TRUE )
 end function
 
+private function hDefGui_cb ( ) as string
+	function = str( env.clopt.modeview = FB_MODEVIEW_GUI )
+end function
+
 private function hDefOutExe_cb ( ) as string
 	function = str( env.clopt.outtype = FB_OUTTYPE_EXECUTABLE )
 end function
@@ -103,7 +107,7 @@ private function hDefOutObj_cb ( ) as string
 end function
 
 private function hDefDebug_cb ( ) as string
-	function = str( env.clopt.debug )
+	function = str( env.clopt.assertions )
 end function
 
 private function hDefErr_cb ( ) as string
@@ -208,7 +212,8 @@ dim shared defTb(0 to ...) as SYMBDEF => _
 	(@"__FB_BACKEND__"        , NULL          , FB_DEFINE_FLAGS_STR, @hDefBackend_cb    ), _
 	(@"__FB_FPU__"            , NULL          , FB_DEFINE_FLAGS_STR, @hDefFpu_cb        ), _
 	(@"__FB_FPMODE__"         , NULL          , FB_DEFINE_FLAGS_STR, @hDefFpmode_cb     ), _
-	(@"__FB_GCC__"            , NULL          , 0                  , @hDefGcc_cb        )  _
+	(@"__FB_GCC__"            , NULL          , 0                  , @hDefGcc_cb        ), _
+	(@"__FB_GUI__"            , NULL          , 0                  , @hDefGui_cb    )  _
 }
 
 sub symbDefineInit _

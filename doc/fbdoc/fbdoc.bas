@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2018 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -47,9 +47,10 @@
 using fb
 using fbdoc
 
-const ManualDir = "../manual/"
-const default_wiki_url = "http://www.freebasic.net/wiki/wikka.php"
-const default_CacheDir = ManualDir + "cache/"
+const default_ManualDir = "../manual/"
+const default_wiki_url = "https://www.freebasic.net/wiki/wikka.php"
+const default_ca_file = ""
+const default_CacheDir = default_ManualDir + "cache/"
 const default_TocPage = "DocToc"
 
 enum OUTPUT_FORMATS
@@ -70,6 +71,7 @@ end sub
 '' --------------------------------------------------------------------------
 
 	dim as integer CacheRefreshMode = CWikiCache.CACHE_REFRESH_IFMISSING
+	dim as string sManualDir = default_ManualDir
 	dim as string sCacheDir = default_CacheDir
 	dim as string sOutputDir = ""
 	dim as string sConnFile, sLangFile, sTocTitle, sDocToc, sTemplateDir
@@ -128,13 +130,15 @@ end sub
 		print "   -makepage pagename"
 		print "                  process a single page (and links on page) only"
 		print "   -maketitles    generate titles.txt"
+		print "   -certificate file"
+		print "              certificate to use to authenticate server (.pem)"
 		print ""
 		end 1
 	end if
 
 	if( bShowVersion ) then
-		print "FreeBASIC User's Manual Converter/Generator - Version 0.1b"
-		print "Copyright (C) 2006-2008 The FreeBASIC development team."
+		print "FreeBASIC User's Manual Converter/Generator - Version 1.00"
+		print "Copyright (C) 2006-2018 The FreeBASIC development team."
 		end 1
 	end if
 
@@ -258,8 +262,10 @@ end sub
 		else
 			if( open( sConnFile for output as #h ) = 0 ) then
 				print #h, "[Wiki Connection]"
-				print #h, "wiki_url = http://www.freebasic.net/wiki/wikka.php"
+				print #h, "wiki_url = https://www.freebasic.net/wiki/wikka.php"
 				print #h,
+				print #h, "[dirs]"
+				print #h, "manual_dir = ./"
 
 				print #h, "[MySql Connection]"
 				print #h, "db_host = localhost"
@@ -285,8 +291,11 @@ end sub
 		end 1
 	end if
 
+	'' if 'manual_dir' exists in the options, let it override any default set
+	sManualDir = connopts->Get( "manual_dir", sManualDir )
+
 	'' Load language options
-	sLangFile = ManualDir + "templates/default/lang/en/common.ini"
+	sLangFile = sManualDir + "templates/default/lang/en/common.ini"
 	if( Lang.LoadOptions( sLangFile ) = FALSE ) then
 		print "Unable to load language file '" + sLangFile + "'"
 		end 1
@@ -305,7 +314,7 @@ end sub
 	end if
 
 	'' Initialize the wiki connection - in case its needed
-	Connection_SetUrl( connopts->Get( "wiki_url", default_wiki_url) )
+	Connection_SetUrl( connopts->Get( "wiki_url", default_wiki_url ), connopts->Get( "certificate", default_ca_file ) )
 
 #if defined(HAVE_MYSQL)
 	'' If using SQL, get all the pages in to the cache now.
@@ -358,7 +367,7 @@ end sub
 	end if
 
 	'' Load Keywords
-	fbdoc_loadkeywords( ManualDir + "templates/default/keywords.lst" )
+	fbdoc_loadkeywords( sManualDir + "templates/default/keywords.lst" )
 
 	if( bMakeTitles ) then
 		'misc_dump_keypageslist( paglist, "keypages.txt" )
@@ -375,8 +384,8 @@ end sub
 	if( ( bEmitFormats and OUT_CHM ) <> 0 )then
 
 		'' Generate CHM
-		sOutputDir = ManualDir + "html/"
-		sTemplateDir = ManualDir + "templates/default/code/"
+		sOutputDir = sManualDir + "html/"
+		sTemplateDir = sManualDir + "templates/default/code/"
 
 		hMkdir( sOutputDir )
 
@@ -398,8 +407,8 @@ end sub
 	if( ( bEmitFormats and OUT_FBHELP ) <> 0 )then
 
 		'' Generate fbhelp output for fbhelp console viewer
-		sOutputDir = ManualDir + "fbhelp/"
-		sTemplateDir = ManualDir + "templates/default/code/"
+		sOutputDir = sManualDir + "fbhelp/"
+		sTemplateDir = sManualDir + "templates/default/code/"
 
 		hMkdir( sOutputDir )
 
@@ -416,8 +425,8 @@ end sub
 	if( ( bEmitFormats and OUT_TXT ) <> 0 )then
 
 		'' Generate ascii Txt output for single txt file
-		sOutputDir = ManualDir + "txt/"
-		sTemplateDir = ManualDir + "templates/default/code/"
+		sOutputDir = sManualDir + "txt/"
+		sTemplateDir = sManualDir + "templates/default/code/"
 
 		hMkdir( sOutputDir )
 
@@ -434,8 +443,8 @@ end sub
 	if( ( bEmitFormats and OUT_TEXINFO ) <> 0 )then
 
 		'' Generate ascii Txt output for single txt file
-		sOutputDir = ManualDir + "texinfo/"
-		sTemplateDir = ManualDir + "templates/default/code/"
+		sOutputDir = sManualDir + "texinfo/"
+		sTemplateDir = sManualDir + "templates/default/code/"
 
 		hMkdir( sOutputDir )
 

@@ -105,17 +105,21 @@
 	#define alloca(x) __builtin_alloca(x)
 #endif
 
-#if defined ENABLE_MT && !defined HOST_DOS && !defined HOST_XBOX
+#if defined ENABLE_MT && !defined HOST_XBOX
 	FBCALL void fb_Lock( void );
 	FBCALL void fb_Unlock( void );
 	FBCALL void fb_StrLock( void );
 	FBCALL void fb_StrUnlock( void );
 	FBCALL void fb_GraphicsLock  ( void );
 	FBCALL void fb_GraphicsUnlock( void );
+	/* NOTE: if both locks are acquired, FB_LOCK() must be called before
+           FB_STRLOCK() in order to avoid deadlocking */
 	#define FB_LOCK()      fb_Lock()
 	#define FB_UNLOCK()    fb_Unlock()
 	#define FB_STRLOCK()   fb_StrLock()
 	#define FB_STRUNLOCK() fb_StrUnlock()
+	/* FIXME: consistent locking order of FB_LOCK and FB_GRAPHICS_LOCK is
+           required. See bug #885 */
 	#define FB_GRAPHICS_LOCK()   fb_GraphicsLock()
 	#define FB_GRAPHICS_UNLOCK() fb_GraphicsUnlock()
 #else

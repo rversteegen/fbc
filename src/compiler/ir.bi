@@ -67,6 +67,7 @@ type IRTAC
 
 	ex1			as FBSYMBOL ptr					'' extra field, used by call/jmp
 	ex2			as integer						'' /
+	ex3			as zstring ptr					'' filename, used by DBG
 end type
 
 type IRVREG
@@ -291,8 +292,8 @@ type IR_VTBL
 		byval labels as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 	emitMem as sub _
@@ -319,7 +320,8 @@ type IR_VTBL
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval ex as integer, _
+		byval filename As zstring ptr = 0 _
 	)
 
 	emitVarIniBegin as sub( byval sym as FBSYMBOL ptr )
@@ -550,7 +552,7 @@ declare function vregDump( byval v as IRVREG ptr ) as string
 
 #define irEmitCOMMENT(text) ir.vtbl.emitComment( text )
 
-#define irEmitJMPTB( v1, tbsym, values, labels, labelcount, deflabel, minval, maxval ) ir.vtbl.emitJmpTb( v1, tbsym, values, labels, labelcount, deflabel, minval, maxval )
+#define irEmitJMPTB( v1, tbsym, values, labels, labelcount, deflabel, bias, span ) ir.vtbl.emitJmpTb( v1, tbsym, values, labels, labelcount, deflabel, bias, span )
 
 #define irGetDistance(vreg) ir.vtbl.getDistance( vreg )
 
@@ -598,7 +600,7 @@ declare function vregDump( byval v as IRVREG ptr ) as string
 
 #define irEmitSCOPEEND(s) ir.vtbl.emitScopeEnd( s )
 
-#define irEmitDBG(op, proc, ex) ir.vtbl.emitDBG( op, proc, ex )
+#define irEmitDBG(op, proc, ex, filename) ir.vtbl.emitDBG( op, proc, ex, filename )
 
 #define irEmitDECL( sym ) ir.vtbl.emitDECL( sym )
 

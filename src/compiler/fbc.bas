@@ -120,12 +120,13 @@ enum
 	FBCTOOL_GORC
 	FBCTOOL_WINDRES
 	FBCTOOL_CXBE
+	FBCTOOL_DXEGEN
 	FBCTOOL__COUNT
 end enum
 
 static shared as zstring * 8 toolnames(0 to FBCTOOL__COUNT-1) = _
 { _
-	"as", "ar", "ld", "gcc", "llc", "dlltool", "GoRC", "windres", "cxbe" _
+	"as", "ar", "ld", "gcc", "llc", "dlltool", "GoRC", "windres", "cxbe", "dxe3gen" _
 }
 
 declare sub fbcFindBin _
@@ -201,6 +202,8 @@ private sub hSetOutName( )
 		     FB_COMPTARGET_NETBSD, FB_COMPTARGET_ANDROID
 			fbc.outname = hStripFilename( fbc.outname ) + _
 				"lib" + hStripPath( fbc.outname ) + ".so"
+		case FB_COMPTARGET_DOS
+			fbc.outname += ".dxe"
 		end select
 	end select
 end sub
@@ -621,6 +624,37 @@ private function hLinkFiles( ) as integer
 	'' Set executable name
 	ldcline += "-o " + QUOTE + fbc.outname + QUOTE
 
+#ifdef __FB_DOS__
+	if (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) and _
+	 (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) then
+		ldcline += " -I """ + hStripExt( fbc.outname ) + "_il.a"""
+		ldcline += " -U"
+		scope
+			dim as string ptr objfile = listGetHead( @fbc.objlist )
+			while( objfile )
+				ldcline += " """ + *objfile + """"
+				objfile = listGetNext( objfile )
+			wend
+		end scope
+		scope
+			dim as string ptr libfile = listGetHead(@fbc.libfiles)
+			if (libfile) then
+				ldcline +=  " -lc"
+			end if
+			while (libfile)
+				ldcline += " """ + *libfile + """"
+				libfile = listGetNext(libfile)
+			wend
+		end scope
+		if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
+			exit function
+		end if
+
+		function = fbcRunBin( "making DXE", FBCTOOL_DXEGEN, ldcline )
+		exit function
+	end if
+#endif
+
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32
 
@@ -754,7 +788,7 @@ private function hLinkFiles( ) as integer
 		ldcline += " -Map " + fbc.mapfile
 	end if
 
-	if( fbGetOption( FB_COMPOPT_DEBUG ) = FALSE ) then
+	if( fbGetOption( FB_COMPOPT_DEBUGINFO ) = FALSE ) then
 		if( fbGetOption( FB_COMPOPT_PROFILE ) = FALSE ) then
 			if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
 				ldcline += " -s"
@@ -938,7 +972,7 @@ private function hLinkFiles( ) as integer
 		ldcline += hFindLib( "crtend.o" )
 
 	end select
-	
+
 	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DARWIN ) then
 		ldcline += " -macosx_version_min 10.6"
 	end if
@@ -1034,7 +1068,7 @@ private function hLinkFiles( ) as integer
 
 		cxbecline = "-TITLE:" + QUOTE + fbc.xbe_title + (QUOTE + " ")
 
-		if( fbGetOption( FB_COMPOPT_DEBUG ) ) then
+		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
 			cxbecline += "-DUMPINFO:" + QUOTE + hStripExt(fbc.outname) + (".cxbe" + QUOTE)
 		end if
 
@@ -1489,7 +1523,7 @@ dim shared as integer option_takes_argument(0 to (OPT__COUNT - 1)) = _
 	FALSE, _ '' OPT_EX
 	FALSE, _ '' OPT_EXX
 	FALSE, _ '' OPT_EXPORT
-	FALSE, _ '' OPT_FORCELANG
+	TRUE,  _ '' OPT_FORCELANG
 	TRUE , _ '' OPT_FPMODE
 	TRUE , _ '' OPT_FPU
 	FALSE, _ '' OPT_G
@@ -1633,7 +1667,8 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 		fbSetOption( FB_COMPOPT_FPUTYPE, value )
 
 	case OPT_G
-		fbSetOption( FB_COMPOPT_DEBUG, TRUE )
+		fbSetOption( FB_COMPOPT_DEBUGINFO, TRUE )
+		fbSetOption( FB_COMPOPT_ASSERTIONS, TRUE )
 
 	case OPT_GEN
 		select case( lcase( arg ) )
@@ -1784,6 +1819,9 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 
 	case OPT_S
 		fbc.subsystem = arg
+		select case( arg )
+      		case "gui" : fbSetOption( FB_COMPOPT_MODEVIEW, FB_MODEVIEW_GUI )
+      	end select
 
 	case OPT_SHOWINCLUDES
 		fbSetOption( FB_COMPOPT_SHOWINCLUDES, TRUE )
@@ -1845,11 +1883,14 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 		fbc.showversion = TRUE
 
 	case OPT_W
-		dim as integer value = -2
+		dim as integer value = FB_WARNINGMSGS_LOWEST_LEVEL - 1
 
 		select case (arg)
 		case "all"
-			value = -1
+			value = FB_WARNINGMSGS_LOWEST_LEVEL
+
+		case "none"
+			value = FB_WARNINGMSGS_HIGHEST_LEVEL + 1
 
 		case "param"
 			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
@@ -1867,15 +1908,27 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
 						 fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_SIGNEDNESS )
 
+		case "constness"
+			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+						 fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CONSTNESS )
+			value = FB_WARNINGMSGS_LOWEST_LEVEL
+
+		case "funcptr"
+			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+						 fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CASTFUNCPTR )
+			value = FB_WARNINGMSGS_LOWEST_LEVEL
+
 		case "pedantic"
 			fbSetOption( FB_COMPOPT_PEDANTICCHK, FB_PDCHECK_DEFAULT )
-			value = -1
+			if( value > FB_WARNINGMSGS_DEFAULT_LEVEL ) then
+				value = FB_WARNINGMSGS_DEFAULT_LEVEL
+			end if
 
 		case else
 			value = clng( arg )
 		end select
 
-		if( value >= -1 ) then
+		if( value >= FB_WARNINGMSGS_LOWEST_LEVEL ) then
 			fbSetOption( FB_COMPOPT_WARNINGLEVEL, value )
 		end if
 
@@ -2940,7 +2993,7 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		'' Avoid gcc exception handling bloat
 		ln += "-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables "
 
-		if( fbGetOption( FB_COMPOPT_DEBUG ) ) then
+		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
 			ln += "-g "
 		end if
 
@@ -3031,7 +3084,7 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 		endif
 	end select
 
-	if( fbGetOption( FB_COMPOPT_DEBUG ) = FALSE ) then
+	if( fbGetOption( FB_COMPOPT_DEBUGINFO ) = FALSE ) then
 		if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
 			ln += "--strip-local-absolute "
 		endif
@@ -3277,7 +3330,7 @@ private sub hAddDefaultLibs( )
 			    defined(__FB_NETBSD__)
 				fbcAddDefLibPath( "/usr/X11R6/lib" )
 			#endif
-			
+
 			#if defined(__FB_DARWIN__) and defined(ENABLE_XQUARTZ)
 				fbcAddDefLibPAth( "/opt/X11/lib" )
 			#endif
@@ -3318,6 +3371,10 @@ private sub hAddDefaultLibs( )
 		fbcAddDefLib( "gcc" )
 		fbcAddDefLib( "c" )
 		fbcAddDefLib( "m" )
+		if( fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
+			fbcAddDefLib( "pthread" )
+			fbcAddDefLib( "socket" )
+		end if
 
 	case FB_COMPTARGET_FREEBSD
 		fbcAddDefLib( "gcc" )

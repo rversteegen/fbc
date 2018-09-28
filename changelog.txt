@@ -1,11 +1,26 @@
 Version 1.06.0
 
 [changed]
+- Name mangling of Integer/Long parameters was reversed on 32bit to match 64bit, so the same FB and C++ code will be compatible on both 32bit and 64bit. Integer is mangled as C++ long (except on Win64), Long is mangled as C++ int.
 - Adjusted warning text for "mixed bool/nonbool operands" warning
+- test-suite uses libfbcunit for unit testing framework
+- SELECT CASE AS CONST respects data type and will show overflow warnings on out-of-range constants
+- boolean: don't allow NEG unary op '-' on boolean data types
+- All fb RTL functions are checked for CONSTness, CONST qualifiers added to fb rtlib built-in prototypes (sf.net #727)
+- WSTRING can be a return type, but only for prototypes (DECLARE) and function pointers, this allows getting PROCPTR() of all fb built-in run time functions
 
 [added]
+- Name mangling of Long parameters on Win64 are mangled to C++ int by default and to C++ long with a modifier in the form 'as [u]long alias "long"'.  The data type size is still 32bit but allows calling external C++ library expecting a C++ long.
 - -noobjinfo option to disable the writing/reading of compile-time library and other linking options from/to .o and .a files. This also disables the use of fbextra.x (the supplemental linker script) for discarding the .fbctinf sections, which is useful when using the gold linker that doesn't support this kind of linker script.
 - Linux console Inkey() now recognizes F11 and F12
+- 2D render through OpenGL on Windows and Linux via screencontrol (angros47)
+- Windows API binding updated to additionally support _WIN32_WINNT &h0501, &h0600, &h0601
+- Under X11, ScreenControl GET_WINDOW_HANDLE places the Display ptr in param2
+- Updated bindings: SDL2 2.0.6, SDL2_image 2.0.1, SDL2_mixer 2.0.1, SDL2_net 2.0.1, SDL2_ttf 2.0.14
+- allow overload operator SQR()
+- allow [static] shared byref variables to be initialized with byref variable
+- warning '-w constness' to enable 'CONST qualifier discarded' warning on command line
+- #pragma constness to enable/disable 'CONST qualifier discarded' warning in source code
 - Add "-arch armv5te" cpu type option, and several arch aliases: x86 (for 686), armeabi and armv5 (for armv5te), armv7 and armv7a (for armv7-a)
 - Android support. Commandline executables and shared/static libraries only; gfxlib (graphical/audio commands) and also console commands like "color" are not supported, nor does the android libc support locales for string<->wstring conversion. THREADCALL is also not enabled. The default target abi is armeabi; use arch=x86, arch=armv7a, or arch=aarch64 to target a different abi.
 - "-fpu neon" option for ARM archs (passed through to gcc).
@@ -46,6 +61,28 @@ Version 1.06.0
 - #846: Fix compiler crash on global variable initializer with type<T>(...) expression where T isn't a UDT
 - #847: Windows API binding: Fixed winnt.bi SECURITY_*_AUTHORITY initializers
 - #851: '#LINE line filename' only changed the source filename in error messages, not in debug info
+- #857: PAINT used in a VIEWport and without delimitation border induces segmentation violation when ending code
+- #832: Fix bug allowing QB style suffixes on all keywords, regardless of -lang
+- #841: The unary negation operator gave different result signedness when used on constant instead of non-constant expression. Now the result is always signed.
+- Incorrect C++ mangling for BYREF parameters using built-in types
+- #844: Fix bug in -gen gcc due to duplicated type (struct) names in the main module and global namespace
+- #875: Fix bug where boolean variable to single/double conversion gives wrong sign on -gen gas -fpu x87 & sse
+- #872: Fix broken boolean bitfield runtime assignments from unsigned values 
+- #876: ThreadCall does not support subroutine with [U]Long type parameter
+- #877: fix SLEEP behaviour in linux console and wait for key presses, and do not affect input buffer.  Match linux SLEEP to behaviour on Windows.
+- Fixed inline asm procedure name mangling bug (missing underscore prefix) with -gen gcc -asm intel on dos/win32
+- #878: Fix fbc-64bit hangs on 'Case True' + 'Case False' inside 'Select Case As const'
+- Fix SELECT CASE AS CONST to allow both signed & unsigned case range values
+- #822, #814, #842: Compiler crash when initializing static/shared reference (DIM SHARED/STATIC BYREF) with non-constant initializer (e.g. another reference, or dynamic array element)
+- ASM backend: Fix bad code generated for comparisons such as IF @globalvar = 0 THEN
+- #884: FORMATing dates can deadlock under Unix
+- #890: Fix Bad @N stdcall suffix for non-trivial byval type parameters with -gen gcc
+- #642, #886: CASTs involving CONST qualifiers solved out too early allowing invalid statements to be compiled
+- #801: *@(expr) solved to (expr) did not cleanly remove null ptr checks allowing invalid datatype assignment with -exx.  *PTRCHK(@expr) solves to (expr).
+- #880: Overload binary operators now support covariant arguments, overloaded procedure resolution changed especially with respect to CONST and non-CONST parameters
+- Fix for debugging lines in include files but not in procedures.  Filename debugging information added for module level statements in included files.
+- #699: fix new[0] causing infinite loop when calling constructor/destructor list
+- #883: when mapping 32 & 64 bit functions for PALETTE [GET] USING, check the data type pointed to and choose one of LONG PTR, LONGINT PTR, INTEGER PTR
 
 
 Version 1.05.0

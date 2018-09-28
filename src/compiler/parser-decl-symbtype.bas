@@ -15,18 +15,122 @@ function cConstIntExpr _
 		byval dtype as integer _
 	) as longint
 
+	'' bad expression? fake a constant value
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		expr = astNewCONSTi( 0, dtype )
 	end if
 
+	'' not a CONST? delete the tree and fake a constant value
 	if( astIsCONST( expr ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDCONST )
 		astDelTree( expr )
 		expr = astNewCONSTi( 0, dtype )
 	end if
 
+	'' flush the expr to the specified dtype.  
+	'' default is FB_DATATYPE_INTEGER, if not specified in call to cConstIntExpr()
 	function = astConstFlushToInt( expr, dtype )
+end function
+
+''
+type RANGEVALUES
+	as longint smin
+	as longint smax
+	as ulongint umax
+end type
+
+function hIsConstInRange _
+	( _
+		byval dtype as integer, _
+		byval value as longint, _
+		byval todtype as integer _
+	) as integer
+
+	'' TODO:
+	'' - consider moving this table to symb-data.bas
+	'' - consider using in astCheckConst(), possibly? with -w pedantic
+	'' - consider adding src/compiler/fb-limit.bi or inc/fb-limit.bi.  These
+	''   limit values are used in several locations in fbc compiler source.
+
+	static range( FB_SIZETYPE_BOOLEAN to FB_SIZETYPE_UINT64 ) as RANGEVALUES = _
+		{ _
+			/' FB_SIZETYPE_BOOLEAN '/ (                  -1ull,                  0ll,                  0ull ), _
+			/' FB_SIZETYPE_INT8    '/ (               -&h80ull,               &h7fll,               &h7full ), _
+			/' FB_SIZETYPE_UINT8   '/ (                   0ll ,               &h7fll,               &hffull ), _
+			/' FB_SIZETYPE_INT16   '/ (             -&h8000ull,             &h7fffll,             &h7fffull ), _
+			/' FB_SIZETYPE_UINT16  '/ (                   0ll ,             &h7fffll,             &hffffull ), _
+			/' FB_SIZETYPE_INT32   '/ (         -&h80000000ull,         &h7fffffffll,         &h7fffffffull ), _
+			/' FB_SIZETYPE_UINT32  '/ (                   0ll ,         &h7fffffffll,         &hffffffffull ), _
+			/' FB_SIZETYPE_INT64   '/ ( -&h8000000000000000ull, &h7fffffffffffffffll, &h7fffffffffffffffull ), _
+			/' FB_SIZETYPE_UINT64  '/ (                   0ll , &h7fffffffffffffffll, &hffffffffffffffffull ) _
+		}
+
+	dim as RANGEVALUES ptr r = @range( typeGetSizeType( todtype ) )
+
+	if( typeIsSigned( dtype ) ) then
+		if( typeIsSigned( todtype ) ) then
+			function = (value >= r->smin) and (value <= r->smax)
+		else
+			if( typeGetSizeType(dtype) = FB_SIZETYPE_INT64 and typeGetSizeType(todtype) = FB_SIZETYPE_UINT64 ) then
+				function = (value >= 0) and (culngint(value) <= culngint(r->smax))
+			else
+				function = (value >= 0) and (culngint(value) <= r->umax)
+			end if
+		endif
+	else
+		if( typeIsSigned( todtype ) ) then
+			if( typeGetSizeType(dtype) = FB_SIZETYPE_UINT64 and typeGetSizeType(todtype) = FB_SIZETYPE_INT64 ) then
+				function = (culngint(value) <= culngint(r->smax))
+			else
+				function = (culngint(value) <= r->umax)
+			end if
+		else
+			function = (culngint(value) <= r->umax)
+		endif
+	end if
+
+end function
+
+''
+function cConstIntExprRanged _
+	( _
+		byval expr as ASTNODE ptr, _
+		byval todtype as integer _
+	) as longint
+
+	'' - this function is very similar cConstIntExpr() except that
+	''   we need to save the dtype of expr before it is flushed, but
+	''   if expr was invalid it might be NULL
+
+	dim as longint value = any
+	dim as integer dtype = any
+
+	'' bad expression? fake a constant value
+	if( expr = NULL ) then
+		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+		expr = astNewCONSTi( 0, todtype )
+	end if
+
+	'' not a CONST? delete the tree and fake a longint constant value
+	if( astIsCONST( expr ) = FALSE ) then
+		errReport( FB_ERRMSG_EXPECTEDCONST )
+		astDelTree( expr )
+		expr = astNewCONSTi( 0, FB_DATATYPE_LONGINT )
+	end if
+
+	'' save the dtype of the expression before we flush the ast to longint
+	dtype = astGetDataType( expr )
+
+	'' flush the expr to longint, it's the largest signed integer datatype we have
+	value = astConstFlushToInt( expr, FB_DATATYPE_LONGINT )
+
+	if( not hIsConstInRange( dtype, value, todtype ) ) then
+		errReportWarn( FB_WARNINGMSG_CONVOVERFLOW )
+	end if
+
+	function = value
+
 end function
 
 private function cSymbolTypeFuncPtr( byval is_func as integer ) as FBSYMBOL ptr
@@ -139,8 +243,8 @@ sub AmbigiousSizeofInfo.maybeWarn( byval tk as integer, byval refers_to_type as 
 	end if
 
 	var msg = "Ambigious " + hGetTokenDescription( tk ) + "()"
-	msg += ", referring to " + symbDumpPretty( sym1 )
-	msg += ", instead of " + symbDumpPretty( sym2 )
+	msg += ", referring to " + symbDumpPrettyToStr( sym1 )
+	msg += ", instead of " + symbDumpPrettyToStr( sym2 )
 	errReportWarn( FB_WARNINGMSG_AMBIGIOUSLENSIZEOF, , , msg )
 end sub
 
@@ -289,6 +393,48 @@ function hIntegerTypeFromBitSize _
 
 end function
 
+private function cMangleModifier _
+	( _
+	) as integer
+
+	function = FALSE
+
+	'' currently, cMangleModifier() returns true/false, because
+	'' we are checking for one case only.  And the FB_DATATYPE
+	'' stored in the upper bits of the dtype in FB_DT_MANGLEMASK
+	'' was selected for convenience.  In future, it might be
+	'' better to have a new FB_MANGLE_DATATYPE enum for tracking
+	'' the desired mapping stored in the upper bits of the
+	'' dtype, especially if there are some mappings that can't
+	'' be found in existing FB_DATATYPE.  To support additional
+	'' checks and mappings, should probably pass a dtype
+	'' parameter in to this procedure to be updated or returned.
+
+	'' ALIAS?
+	if( lexGetToken( ) = FB_TK_ALIAS ) then
+		lexSkipToken( )
+
+		'' "long"?
+		if( lexGetClass( ) = FB_TKCLASS_STRLITERAL ) then
+			select case lcase( *lexGetText( ) )
+			case "long"
+				'' only Win64 is affected by ths modifer
+				function = fbIs64bit( ) and ((env.target.options and FB_TARGETOPT_UNIX) = 0)
+			case ""
+				errReport( FB_ERRMSG_EMPTYALIASSTRING )
+			case else
+				errReport( FB_ERRMSG_SYNTAXERROR )	
+			end select
+
+			lexSkipToken( )
+		else
+			errReport( FB_ERRMSG_SYNTAXERROR )
+		end if
+
+	end if
+
+end function
+
 '':::::
 ''SymbolType      =   CONST? UNSIGNED? (
 ''				      ANY
@@ -424,10 +570,16 @@ function cSymbolType _
 		case FB_TK_LONG
 			lexSkipToken( )
 			dtype = FB_DATATYPE_LONG
+			if( cMangleModifier() ) then
+				dtype = typeSetMangleDt( dtype, FB_DATATYPE_INTEGER )
+			end if
 
 		case FB_TK_ULONG
 			lexSkipToken( )
 			dtype = FB_DATATYPE_ULONG
+			if( cMangleModifier() ) then
+				dtype = typeSetMangleDt( dtype, FB_DATATYPE_UINT )
+			end if
 
 		case FB_TK_LONGINT
 			lexSkipToken( )
@@ -564,7 +716,11 @@ function cSymbolType _
 				dtype = FB_DATATYPE_UINT
 
 			case FB_DATATYPE_LONG
-				dtype = FB_DATATYPE_ULONG
+				if( typeHasMangleDt( dtype ) ) then
+					dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
+				else
+					dtype = FB_DATATYPE_ULONG
+				end if
 
 			case FB_DATATYPE_LONGINT
 				dtype = FB_DATATYPE_ULONGINT

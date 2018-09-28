@@ -185,7 +185,8 @@ declare sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr = 0 _
 	)
 declare function hVregToStr( byval vreg as IRVREG ptr ) as string
 declare sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
@@ -334,7 +335,7 @@ private function vregPretty( byval v as IRVREG ptr ) as string
 		s += "*" & v->mult
 	end if
 
-	's += " " + typeDump( v->dtype, v->subtype )
+	's += " " + typeDumpToStr( v->dtype, v->subtype )
 
 	function = s
 end function
@@ -892,7 +893,7 @@ private function _emitBegin( ) as integer
 		builtins(i).used = FALSE
 	next
 
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		_emitDBG( AST_OP_DBG_LINEINI, NULL, 0 )
 	end if
 
@@ -1535,7 +1536,7 @@ private sub _emitBop _
 		byval label as FBSYMBOL ptr _
 	)
 
-	var bopdump = vregPretty( v1 ) + " " + astDumpOp( op ) + " " + vregPretty( v2 )
+	var bopdump = vregPretty( v1 ) + " " + astDumpOpToStr( op ) + " " + vregPretty( v2 )
 	if( label ) then
 		hAstCommand( "branchbop " + bopdump )
 	elseif( vr = NULL ) then
@@ -1602,7 +1603,7 @@ private sub _emitUop _
 		byval vr as IRVREG ptr _
 	)
 
-	var uopdump = astDumpOp( op ) + " " + vregPretty( v1 )
+	var uopdump = astDumpOpToStr( op ) + " " + vregPretty( v1 )
 	if( vr = NULL ) then
 		hAstCommand( "selfuop " + uopdump )
 	else
@@ -1993,8 +1994,8 @@ private sub _emitJmpTb _
 		byval labels as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 	hAstCommand( "jmptb " + vregPretty( v1 ) )
@@ -2013,7 +2014,7 @@ private sub _emitJmpTb _
 
 	ctx.indent += 1
 	for i as integer = 0 to labelcount - 1
-		ln = dtype + " " & values[i] & ", "
+		ln = dtype + " " & (values[i]+bias) & ", "
 		ln += "label %" + *symbGetMangledName( labels[i] )
 		hWriteLine( ln )
 	next
@@ -2080,13 +2081,18 @@ private sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr _
 	)
 
-	if( op = AST_OP_DBG_LINEINI ) then
-		hWriteLine( "#line " & ex & " """ & hReplace( env.inf.name, "\", $"\\" ) & """" )
-		ctx.linenum = ex
-	end if
+	if( op = AST_OP_DBG_LINEINI ) Then
+		if( filename <> NULL ) then
+			hWriteLine( "#line " & lnum & " """ & hReplace( filename, "\", $"\\" ) & """" )
+		else
+			hWriteLine( "#line " & lnum & " """ & hReplace( env.inf.name, "\", $"\\" ) & """" )
+		end if
+		ctx.linenum = lnum
+	end If
 
 end sub
 

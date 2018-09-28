@@ -183,8 +183,8 @@ type EMIT_JTBNODE
 	labelcount			as integer
 
 	deflabel			as FBSYMBOL ptr
-	minval				as ulongint
-	maxval				as ulongint
+	bias				as ulongint
+	span				as ulongint
 end type
 
 type EMIT_MEMNODE
@@ -199,6 +199,7 @@ type EMIT_DBGNODE
 	op			as integer
 	sym			as FBSYMBOL ptr
 	lnum		as integer
+	filename 	as zstring ptr
 	pos			as integer
 end type
 
@@ -250,8 +251,8 @@ type EMIT_JTBCB as sub _
 		byval labels1 as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 type EMIT_MEMCB as sub( byval dvreg as IRVREG ptr, _
@@ -261,7 +262,8 @@ type EMIT_MEMCB as sub( byval dvreg as IRVREG ptr, _
 
 type EMIT_DBGCB as sub( byval sym as FBSYMBOL ptr, _
 						byval lnum as integer, _
-						byval pos as integer )
+                  byval pos as Integer, _
+                  ByVal filename As ZString Ptr =0 )
 
 '' if changed, update the _vtbl symbols at emit_*.bas::*_ctor
 type EMIT_VTBL
@@ -422,8 +424,8 @@ declare function emitJMPTB _
 		byval labels1 as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	) as EMIT_NODE ptr
 
 declare function emitCALL _
@@ -790,7 +792,8 @@ declare function emitSTKCLEAR _
 declare function emitDBGLineBegin _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+      byval ex as Integer, _
+      ByVal filename As ZString Ptr _
 	) as EMIT_NODE ptr
 
 declare function emitDBGLineEnd _

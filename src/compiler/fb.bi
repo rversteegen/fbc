@@ -69,7 +69,8 @@ enum FB_COMPOPT
 	FB_COMPOPT_FORCELANG            '' boolean: TRUE if -forcelang was specified
 
 	'' debugging/error checking
-	FB_COMPOPT_DEBUG                '' boolean: -g
+	FB_COMPOPT_DEBUGINFO            '' boolean: debugging info (affects code generation)
+	FB_COMPOPT_ASSERTIONS           '' boolean: enable assert() and __FB_DEBUG__
 	FB_COMPOPT_ERRORCHECK           '' boolean: runtime error checks
 	FB_COMPOPT_RESUMEERROR          '' boolean: RESUME support
 	FB_COMPOPT_EXTRAERRCHECK        '' boolean: NULL pointer/array bounds checks
@@ -91,9 +92,17 @@ enum FB_COMPOPT
 	FB_COMPOPT_STACKSIZE            '' integer
 	FB_COMPOPT_OBJINFO              '' boolean: write/read .fbctinf sections etc.?
 	FB_COMPOPT_SHOWINCLUDES         '' boolean: -showincludes
+	FB_COMPOPT_MODEVIEW             ''__FB_GUI__
 
 	FB_COMPOPTIONS
 end enum
+
+enum FB_MODEVIEW
+	FB_MODEVIEW_CONSOLE = 0
+	FB_MODEVIEW_GUI
+end enum
+
+const FB_DEFAULT_MODEVIEW   =  FB_MODEVIEW_CONSOLE
 
 '' pedantic checks
 enum FB_PDCHECK
@@ -105,10 +114,12 @@ enum FB_PDCHECK
 	FB_PDCHECK_NEXTVAR      = &h00000008
 	FB_PDCHECK_CASTTONONPTR = &h00000010
 	FB_PDCHECK_SIGNEDNESS   = &h00000020
+	FB_PDCHECK_CASTFUNCPTR  = &h00000040
+	FB_PDCHECK_CONSTNESS    = &h00000080
 
 	FB_PDCHECK_ALL          = &hffffffff
 
-	FB_PDCHECK_DEFAULT      = FB_PDCHECK_ALL xor ( FB_PDCHECK_NEXTVAR or FB_PDCHECK_SIGNEDNESS )
+	FB_PDCHECK_DEFAULT      = FB_PDCHECK_ALL xor ( FB_PDCHECK_NEXTVAR or FB_PDCHECK_SIGNEDNESS or FB_PDCHECK_CASTFUNCPTR or FB_PDCHECK_CONSTNESS )
 end enum
 
 '' cpu types
@@ -242,14 +253,15 @@ type FBCMMLINEOPT
 	forcelang       as integer              '' TRUE if -forcelang was specified
 
 	'' debugging/error checking
-	debug           as integer              '' true = add debug info (default = false)
+	debuginfo       as integer              '' true = add debug info (default = false)
+	assertions      as integer              '' true = enable assert() and __FB_DEBUG__ (default = false)
 	errorcheck      as integer              '' enable runtime error checks?
 	resumeerr       as integer              '' enable RESUME support?
 	extraerrchk     as integer              '' enable NULL pointer/array bounds checks?
 	profile         as integer              '' build profiling code (default = false)
 
 	'' error/warning reporting behaviour
-	warninglevel    as integer              '' (default = 0)
+	warninglevel    as integer              '' (default = FB_WARNINGMSGS_DEFAULT_LEVEL)
 	showerror       as integer              '' show line giving error (default = true)
 	maxerrors       as integer              '' max number errors the parser will show
 	pdcheckopt      as FB_PDCHECK           '' pedantic checks
@@ -264,6 +276,7 @@ type FBCMMLINEOPT
 	stacksize       as integer
 	objinfo         as integer
 	showincludes    as integer
+	modeview        as FB_MODEVIEW
 end type
 
 '' features allowed in the selected language
