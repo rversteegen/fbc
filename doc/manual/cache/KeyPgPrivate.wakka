@@ -6,13 +6,16 @@ Specifies a procedure having internal linkage
 		//..procedure body..//
 	[[KeyPgEnd|End]] [[KeyPgSub|Sub]]
 	
-	**Private** [[KeyPgFunction|Function]] //procedure_name// [[[KeyPgCdecl|Cdecl]]|[[KeyPgStdcall|Stdcall]]|[[KeyPgPascal|Pascal]]] [[[KeyPgOverload|Overload]]] [[[KeyPgAlias|Alias]] //"""external_name"""//] [([//parameter_list//])] [[KeyPgAs|as]] //return_type//  [[[KeyPgStatic|Static]]] [[[KeyPgExport|Export]]]
+	**Private** [[KeyPgFunction|Function]] //procedure_name// [[[KeyPgCdecl|Cdecl]]|[[KeyPgStdcall|Stdcall]]|[[KeyPgPascal|Pascal]]] [[[KeyPgOverload|Overload]]] [[[KeyPgAlias|Alias]] //"""external_name"""//] [([//parameter_list//])] [ [[KeyPgByrefFunction|byref]] ] [[KeyPgAs|as]] //return_type//  [[[KeyPgStatic|Static]]] [[[KeyPgExport|Export]]]
 		//..procedure body..//
 	[[KeyPgEnd|End]] [[KeyPgFunction|Function]]
 ##
 {{fbdoc item="desc"}}
-	In procedure definitions, ##**Private**## specifies that a procedure has internal linkage, meaning its name is not visible to external modules.
-
+	In procedure definitions (forbidden at declaration line level), ##**Private**## specifies that a procedure has internal linkage, meaning its name is not visible to external modules.
+	Therefore among the compiled modules, two procedures with the same identifier, but defined inside different modules, may exist if both are ##**Private**##.
+	
+	The compiler removes the ##**Private**## procedures that are not called, but this does not currently work for ##**Private**## procedures that are only called by other ##**Private**## procedures that are not called themselves, because the first one appears as being called.
+	
 	The ##[[KeyPgOptionprivate|Option Private]]## statement allows procedures to be defined with internal linkage by default.
 
 {{fbdoc item="ex"}}

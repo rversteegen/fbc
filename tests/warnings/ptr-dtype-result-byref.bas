@@ -112,7 +112,7 @@ testNoWarning( pi , pui  )
 	testNoWarning( pul, pui )
 #endif
 
-#ifdef __FB_UNIX__
+#if sizeof(wstring) = 4
 	'' wstring = 4 bytes = long
 	testNoWarning( l  , w  )
 	testNoWarning( ul , w  )
@@ -125,7 +125,7 @@ testNoWarning( pi , pui  )
 		testNoWarning( pi , pw )
 		testNoWarning( pui, pw )
 	#endif
-#elseif defined(__FB_DOS__)
+#elseif sizeof(wstring) = 1
 	'' wstring = byte = zstring
 	testNoWarning( b  , w  )
 	testNoWarning( ub , w  )
@@ -147,7 +147,7 @@ testNoWarning( pi , pui  )
 
 #macro checkLhsAndRhs( lhs, rhs )
 	#if #lhs <> #rhs
-		test( lhs, rhs, 1 )
+		test( lhs, rhs, 2 )
 	#endif
 #endmacro
 

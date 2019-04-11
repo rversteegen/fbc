@@ -3,10 +3,10 @@
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
 ''
-'' See Also: http://www.freebasic.net/wiki/wikka.php?wakka=ExtLibcryptlib
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibcryptlib
 '' --------
 
-#include once "cryptlib.bi"
+#include Once "cryptlib.bi"
 
 Function calc_hash( ByVal filename As String, ByVal algo As CRYPT_ALGO_TYPE ) As String
 	Const BUFFER_SIZE = 8192
@@ -38,7 +38,7 @@ Function calc_hash( ByVal filename As String, ByVal algo As CRYPT_ALGO_TYPE ) As
 	cryptEncrypt( ctx, 0, 0 )
 
 	'' get the hash result
-	Dim As Integer buffersize = BUFFER_SIZE
+	Dim As Long buffersize = BUFFER_SIZE
 	cryptGetAttributeString( ctx, CRYPT_CTXINFO_HASHVALUE, @buffer(0), @buffersize )
 
 	'' convert to hexadecimal
@@ -63,8 +63,8 @@ End Function
 	cryptInit( )
 
 	'' calculate hashes
-	Print "md5: "; calc_hash( filename, CRYPT_ALGO_MD5 )
-	Print "sha: "; calc_hash( filename, CRYPT_ALGO_SHA )
+	Print "md5:  "; calc_hash( filename, CRYPT_ALGO_MD5 )
+	Print "sha1: "; calc_hash( filename, CRYPT_ALGO_SHA1 )
 
 	'' shutdown cryptlib
 	cryptEnd( )

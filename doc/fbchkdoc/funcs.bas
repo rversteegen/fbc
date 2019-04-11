@@ -1,5 +1,5 @@
 ''  fbchkdoc - FreeBASIC Wiki Management Tools
-''	Copyright (C) 2008 Jeffery R. Marshall (coder[at]execulink[dot]com)
+''	Copyright (C) 2008-2019 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@ function ParsePageName( byref x as string, byref comment as string ) as string
 				tmp = trim( mid( r, i + 1) , any " " + chr(9) )
 				r = trim( mid( r, i + 1, j - i - 1) , any " " + chr(9) )
 
-				i = instr( i + 1, tmp, "[" )
+				i = instr( tmp, "[" )
 				if( i > 0 ) then
 					cmt = mid( tmp, i + 1 )
 					if( right( cmt, 1 ) = "]" ) then

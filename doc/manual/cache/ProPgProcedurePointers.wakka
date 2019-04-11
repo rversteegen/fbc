@@ -1,6 +1,6 @@
 {{fbdoc item="title" value="Pointers to Procedures"}}----
 Pointers that point to procedures
-
+	
 	Just as pointers can be made to point to an ##[[KeyPgInteger|Integer]]## or ##[[KeyPgSingle|Single]]## type, pointers can also point to procedures, that is, they can store the address of a procedure.
 
 {{fbdoc item="section" value="Declaration"}}
@@ -32,8 +32,9 @@ dim pFunc as function (as integer, as integer) as integer = @Add
 print "3 + 4 = " & pFunc(3, 4)
 %%
 	For a calling example of subroutine pointer, see the ##[[KeyPgOpAt|Operator @ (Address of)]]## page.
-
 	
+	**Note:** When calling a procedure through a procedure pointer, parentheses surrounding the argument list (even empty) are mandatory to resolve ambiguity with a simple access to the pointer value.
+
 {{fbdoc item="section" value="Passing procedure pointers to procedures"}}
 	Passing procedure pointers to other procedures is similar as well:
 
@@ -127,6 +128,36 @@ p = @T.test
 dim as T obj
 
 print p(obj, 69) '' prints 489
+%%
+
+{{fbdoc item="section" value="Typing rule for procedure pointer declaration"}}
+	The procedure pointer declaration allows to assign to the pointer:
+		- not only a procedure with the same parameters types, and if any, the same result type,
+		- but also a procedure with contravariant byref (or by pointer) parameters or/and a covariant byref (or by pointer) result.
+
+{{fbdoc item="filename" value="examples/manual/proguide/procptrs/typing-rule.bas"}}%%(freebasic)
+'Example of assigning to a function pointer a function with a contravariant parameter and a covariant result.
+
+Type A
+	Dim As Integer I
+End type
+
+Type B Extends A
+	Dim As Integer J
+End Type
+
+Function f (Byref a0 As A) As B Ptr
+	Print "instance of B created"
+	Return New B(a0)
+End Function
+
+Dim As Function (Byref As B) As A Ptr pf = @f
+
+Dim As B b0
+Dim As A Ptr pab = pf(b0)
+
+Sleep
+Delete Cptr(B Ptr, pab)
 %%
 
 {{fbdoc item="see"}}

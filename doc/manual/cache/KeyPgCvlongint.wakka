@@ -1,5 +1,5 @@
 {{fbdoc item="title" value="CVLONGINT"}}----
-Converts a double-precision floating-point number or eight-byte string to a ##[[KeypgLongint|Longint]]## variable
+Converts a double-precision floating-point number or eight-byte string to a ##[[KeyPgLongint|Longint]]## variable
 
 {{fbdoc item="syntax"}}##
 	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Cvlongint** ( [[KeyPgByval|byval]] //dbl// [[KeyPgAs|as]] [[KeyPgSingle|double]] ) [[KeyPgAs|as]] [[KeyPgLong|longint]]
@@ -11,7 +11,7 @@ Converts a double-precision floating-point number or eight-byte string to a ##[[
 ##
 {{fbdoc item="param"}}
 	##//dbl//##
-		A ##[[KeyPgDouble|Double]]## floating-point number with a binary copy of a ##[[keyPgLongint|Longint]]## variable stored in it.
+		A ##[[KeyPgDouble|Double]]## floating-point number with a binary copy of a ##[[KeyPgLongint|Longint]]## variable stored in it.
 	##//str//##
 		A ##[[KeyPgString|String]]## at least eight bytes in length with a binary copy of a ##[[KeyPgLongint|Longint]]## variable stored in it.
 
@@ -20,16 +20,16 @@ Converts a double-precision floating-point number or eight-byte string to a ##[[
 
 {{fbdoc item="desc"}}
 	Returns a 64-bit ##[[KeyPgLongint|Longint]]## value using the binary data contained in a ##[[KeyPgDouble|Double]]##, or a ##[[KeyPgString|String]]## of at least eight bytes in length.  A value of zero (##0##) is returned if the string is less than eight bytes in length.
-
+	
 	##**Cvlongint**## is used to convert 8-byte strings created with ##[[KeyPgMklongint|Mklongint]]##.
-
+	
 	This function can also be used to convert 64-bit integer values from a memory or file buffer without the need for a ##[[KeyPgType|Type]]## structure.  However, just as with the type structure, special care should be taken when using ##**Cvlongint**## to convert strings that have been read from a buffer.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/strings/cvlongint.bas"}}%%(freebasic)
 dim ll as longint, s as string
 s = "ABCDEFGH"
-ll = cvlongint(ll)
+ll = cvlongint(s)
 print using "s = ""&"""; s
 print using "ll = _&H&"; hex(ll)
 %%

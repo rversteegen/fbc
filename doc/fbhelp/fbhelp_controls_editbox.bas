@@ -1,5 +1,5 @@
 ''  fbhelp - FreeBASIC help viewer
-''  Copyright (C) 2006-2008 Jeffery R. Marshall (coder[at]execulink.com)
+''  Copyright (C) 2006-2018 Jeffery R. Marshall (coder[at]execulink.com)
 
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ public sub EditBox_Update _
 		bVisible = FALSE
 	end if
 
-	if( bVisible = TRUE ) then
+	if( bVisible ) then
 		Screen_SetCursorPos _
 			( _
 				ctl->ctl.rect.x + ctl->buffer->mindex - ctl->leftindex, _

@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -23,11 +23,6 @@
 ''
 
 #include once "list.bi"
-
-#ifndef FALSE
-#define FALSE 0
-#define TRUE -1
-#endif
 
 #define NULL 0
 	

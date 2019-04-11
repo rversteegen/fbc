@@ -30,14 +30,19 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -88,14 +93,19 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -146,14 +156,19 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -190,14 +205,19 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -374,6 +394,7 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 			
 			if( c > UTF16_MAX_BMP )
 			{
+				c -= UTF16_HALFBASE;
 				*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);				
 				c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 				--charsleft;
@@ -398,12 +419,13 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 
 			if( c > UTF16_MAX_BMP )
 			{
+				c -= UTF16_HALFBASE;
 				if( charsleft > 1 )
 				{
 					*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);				
-					c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 					--charsleft;
 				}
+				c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 			}
 
 			*dst++ = c;

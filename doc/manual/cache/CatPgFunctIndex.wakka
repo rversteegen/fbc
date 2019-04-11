@@ -1,8 +1,7 @@
 {{fbdoc item="title" value="Functional Keyword List"}}----
 List of ""FreeBASIC"" keywords sorted by the function they perform.
 
-<<
-{{fbdoc item="section" value="Arrays"}}
+<<{{fbdoc item="section" value="Arrays"}}
 	- {{fbdoc item="keyword" value="KeyPgErase|ERASE"}}
 	- {{fbdoc item="keyword" value="KeyPgLbound|LBOUND"}}
 	- {{fbdoc item="keyword" value="KeyPgRedim|REDIM"}}
@@ -65,15 +64,19 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgWrite|WRITE"}}
 
 {{fbdoc item="section" value="Data types and declarations"}}
-	- {{fbdoc item="keyword" value="KeyPgBoolean|BOOLEAN"}}
-	- {{fbdoc item="keyword" value="KeyPgByte|BYTE"}}
+	- {{fbdoc item="keyword" value="KeyPgAliasModifier|ALIAS (Modifier)"}}
 	- {{fbdoc item="keyword" value="KeyPgAs|AS"}}
-	- {{fbdoc item="keyword" value="KeyPgDim|DIM"}}
+	- {{fbdoc item="keyword" value="KeyPgBoolean|BOOLEAN"}}
+	- {{fbdoc item="keyword" value="KeyPgByrefVariables|BYREF (variables)"}}
+	- {{fbdoc item="keyword" value="KeyPgByte|BYTE"}}
 	- {{fbdoc item="keyword" value="KeyPgConst|CONST"}}
 	- {{fbdoc item="keyword" value="KeyPgConstQualifier|CONST (Qualifier)"}}
+	- {{fbdoc item="keyword" value="KeyPgDim|DIM"}}
 	- {{fbdoc item="keyword" value="KeyPgDouble|DOUBLE"}}
 	- {{fbdoc item="keyword" value="KeyPgEnum|ENUM"}}
 	- {{fbdoc item="keyword" value="KeyPgExtends|EXTENDS"}}
+	- {{fbdoc item="keyword" value="KeyPgFunctionPtr|FUNCTION (Pointer)"}}
+	- {{fbdoc item="keyword" value="KeyPgImplements|IMPLEMENTS"}}
 	- {{fbdoc item="keyword" value="KeyPgInteger|INTEGER"}}
 	- {{fbdoc item="keyword" value="KeyPgLong|LONG"}}
 	- {{fbdoc item="keyword" value="KeyPgLongint|LONGINT"}}
@@ -81,9 +84,10 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgScope|SCOPE"}}
 	- {{fbdoc item="keyword" value="KeyPgShared|SHARED"}}
 	- {{fbdoc item="keyword" value="KeyPgShort|SHORT"}}
-	- {{fbdoc item="keyword" value="KeyPgString|STRING"}}
 	- {{fbdoc item="keyword" value="KeyPgSingle|SINGLE"}}
 	- {{fbdoc item="keyword" value="KeyPgStatic|STATIC"}}
+	- {{fbdoc item="keyword" value="KeyPgString|STRING"}}
+	- {{fbdoc item="keyword" value="KeyPgSubPtr|SUB (Pointer)"}}
 	- {{fbdoc item="keyword" value="KeyPgType|TYPE"}}
 	- {{fbdoc item="keyword" value="KeyPgTypeAlias|TYPE (Alias)"}}
 	- {{fbdoc item="keyword" value="KeyPgTypeTemp|TYPE (Temporary)"}}
@@ -227,7 +231,6 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgWait|WAIT"}}
 	- {{fbdoc item="keyword" value="KeyPgOpenCom|OPEN COM"}}
 	- {{fbdoc item="keyword" value="KeyPgOpenLpt|OPEN LPT"}}
-	- {{fbdoc item="keyword" value="KeyPgOpenLpt|LPT"}}
 	- {{fbdoc item="keyword" value="KeyPgLpos|LPOS"}}
 	- {{fbdoc item="keyword" value="KeyPgLprint|LPRINT"}}
 
@@ -310,8 +313,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgMetaStatic|$STATIC"}}
 	- {{fbdoc item="keyword" value="KeyPgMetaInclude|$INCLUDE"}}
 	- {{fbdoc item="keyword" value="KeyPgMetaLang|$LANG"}}
-<<>>
-{{fbdoc item="section" value="Miscellaneous"}}
+<<>>{{fbdoc item="section" value="Miscellaneous"}}
 	- {{fbdoc item="keyword" value="KeyPgAsm|ASM"}}
 	- {{fbdoc item="keyword" value="KeyPgData|DATA"}}
 	- {{fbdoc item="keyword" value="KeyPgEndblock|END (Block)"}}
@@ -397,6 +399,8 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbargc|__FB_ARGC__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbargv|__FB_ARGV__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbarm|__FB_ARM__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbasm|__FB_ASM__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdFBBackend|__FB_BACKEND__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBBigEndian|__FB_BIGENDIAN__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBBuildDate|__FB_BUILD_DATE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbcygwin|__FB_CYGWIN__"}}
@@ -404,7 +408,11 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbdebug|__FB_DEBUG__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbdos|__FB_DOS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfberr|__FB_ERR__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbfpmode|__FB_FPMODE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbfpu|__FB_FPU__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbfreebsd|__FB_FREEBSD__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbgcc|__FB_GCC__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblang|__FB_LANG__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblinux|__FB_LINUX__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBMain|__FB_MAIN__"}}
@@ -421,12 +429,15 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfboutexe|__FB_OUT_EXE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfboutlib|__FB_OUT_LIB__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfboutobj|__FB_OUT_OBJ__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbpcos|__FB_PCOS__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdfbsignature|__FB_SIGNATURE__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdfbsse|__FB_SSE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbversion|__FB_VERSION__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBVerMajor|__FB_VER_MAJOR__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBVerMinor|__FB_VER_MINOR__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBVerPatch|__FB_VER_PATCH__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbunix|__FB_UNIX__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbvectorize|__FB_VECTORIZE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbwin32|__FB_WIN32__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbxbox|__FB_XBOX__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfile|__FILE__"}}
@@ -464,7 +475,6 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgInclude|ONCE"}}
 
 {{fbdoc item="section" value="Procedures"}}
-	- {{fbdoc item="keyword" value="KeyPgDots|..."}}
 	- {{fbdoc item="keyword" value="KeyPgAbstract|ABSTRACT (member)"}}
 	- {{fbdoc item="keyword" value="KeyPgAlias|ALIAS"}}
 	- {{fbdoc item="keyword" value="KeyPgAny|ANY"}}
@@ -498,10 +508,18 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgMemberSub|SUB (Member)"}}
 	- {{fbdoc item="keyword" value="KeyPgStdcall|STDCALL"}}
 	- {{fbdoc item="keyword" value="KeyPgThis|THIS"}}
+	- {{fbdoc item="keyword" value="KeyPgVirtual|VIRTUAL (member)"}}
+
+{{fbdoc item="section" value="Variadic Procedures"}}
+	- {{fbdoc item="keyword" value="KeyPgDots|..."}}
+	- {{fbdoc item="keyword" value="KeyPgCvaArg|CVA_ARG"}}
+	- {{fbdoc item="keyword" value="KeyPgCvaCopy|CVA_COPY"}}
+	- {{fbdoc item="keyword" value="KeyPgCvaEnd|CVA_END"}}
+	- {{fbdoc item="keyword" value="KeyPgCvaList|CVA_LIST"}}
+	- {{fbdoc item="keyword" value="KeyPgCvaStart|CVA_START"}}
 	- {{fbdoc item="keyword" value="KeyPgVaArg|VA_ARG"}}
 	- {{fbdoc item="keyword" value="KeyPgVaFirst|VA_FIRST"}}
 	- {{fbdoc item="keyword" value="KeyPgVaNext|VA_NEXT"}}
-	- {{fbdoc item="keyword" value="KeyPgVirtual|VIRTUAL (member)"}}
 
 {{fbdoc item="section" value="Program flow"}}
 	- {{fbdoc item="keyword" value="KeyPgContinue|CONTINUE"}}

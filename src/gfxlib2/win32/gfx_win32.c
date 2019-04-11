@@ -89,8 +89,13 @@ static void fb_hSetMouseClip( void )
 	ClipCursor(&rc);
 }
 
-static void ToggleFullScreen( void )
+static void ToggleFullScreen( EVENT *e )
 {
+	if (has_focus) {
+		e->type = EVENT_MOUSE_EXIT;
+		fb_hPostEvent(e);
+	}
+
 	if (fb_win32.flags & DRIVER_NO_SWITCH)
 		return;
 
@@ -322,24 +327,22 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			break;
 
 		case WM_SIZE:
-		case WM_SYSKEYDOWN:
-			if (!fb_win32.is_active)
-				break;
-
-			{
-				int is_alt_enter = ((message == WM_SYSKEYDOWN) && (wParam == VK_RETURN) && (lParam & 0x20000000));
-				int is_maximize = ((message == WM_SIZE) && (wParam == SIZE_MAXIMIZED));
-				if ( is_maximize || is_alt_enter) {
-					if (has_focus) {
-						e.type = EVENT_MOUSE_EXIT;
-						fb_hPostEvent(&e);
-					}
-					ToggleFullScreen();
+			if (fb_win32.is_active) {
+				if ( wParam == SIZE_MAXIMIZED ) {
+					ToggleFullScreen(&e);
 					return FALSE;
 				}
-				if( message!=WM_SYSKEYDOWN )
-					break;
 			}
+			break;
+
+		case WM_SYSKEYDOWN:
+			if (fb_win32.is_active) {
+				if ( (wParam == VK_RETURN) && (lParam & 0x20000000) ) {
+					ToggleFullScreen(&e);
+					return FALSE;
+				}
+			}
+			/* fall through */
 
 		case WM_KEYDOWN:
 		case WM_KEYUP:
@@ -781,6 +784,11 @@ void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *re
 ssize_t fb_hGetWindowHandle(void)
 {
 	return (ssize_t)fb_win32.wnd;
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+	return 0;
 }
 
 static void keyconv_clear( KEYCONVINFO *k )

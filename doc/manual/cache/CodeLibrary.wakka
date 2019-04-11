@@ -1,14 +1,13 @@
+{{fbdoc item="title" value="Community Code Library"}}----
  ""FreeBASIC"" Code, Games, and Libraries.  Written in ""FreeBASIC"", by ""FreeBASIC"" Community Members.
 
 <<{{anchor name="EDITOR"}}{{fbdoc item="section" value="Code Editors & IDEs "}}
 	[[http://www.freebasic.net/forum/viewtopic.php?t=13932|FBEdit, an IDE for FB by KetilO (Win32)]]
-	[[http://www.planetsquires.com/jellyfishpro_freebasic.htm|JellyFish Pro, an IDE for FB by Paul Squires (Win32)]]
+	[[https://www.freebasic.net/forum/viewtopic.php?f=8&t=25215|WinFBE Editor and Visual Designer, an IDE for FB by Paul Squires (Win32,Win64)]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=9035|VISG GUI Builder (WIN) by mrhx]]
-	[[http://www.freewebs.com/fielden/|EzeeGui GUI builder (WIN) by Jerry Fielden]]	         
 
 {{anchor name="GRAPHIC"}}{{fbdoc item="section" value="Graphics Code"}}
 	==Demos==
-	[[http://aapproj.phatcode.net/fbgfx/index.html|The FreeBASIC GFX Demo Central by Adigun A.Polack]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=6938|Animated Clouds by Zamaster]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=7936|Island Generation by rdc]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=8758|Plasma Generation by Zamaster]]
@@ -21,18 +20,18 @@
 	[[http://www.freebasic.net/forum/viewtopic.php?t=9588|Accurate Image Scaler by KristopherWindsor]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=6676|Spline Curve by Zamaster]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=13251|Rotozoom by Dr_D]]
-
+	
 	==Colors and Palettes==
 	[[http://www.freebasic.net/forum/viewtopic.php?t=9441|24bit to 16bit color width by Eternal_Pain]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=8764|HSV Color Space by Antoni]]
-
+	
 	==Formats==
 	[[http://www.freebasic.net/forum/viewtopic.php?t=8024|fbpng library by yetifoot]]
-
+	
 	==3D==
 	[[http://www.freebasic.net/forum/viewtopic.php?t=8724|Tree Generation by Zamaster]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=7931|Quadtree-Based Renderer by relsoft]]
-
+	
 	==Animation==
 	[[http://www.freebasic.net/forum/viewtopic.php?t=7340|ASCII Animation Example by Pritchard]]
 	[[http://lachie.phatcode.net/articles.php|Chain-Like Animation Tutorial by Lachie Dazdarian]]
@@ -50,7 +49,7 @@
 	[[http://www.freebasic.net/forum/viewtopic.php?p=75713|BCD arithmetics by srvaldez]]
 	[[http://www.freebasic.net/forum/viewtopic.php?p=49695|10Byte extended float by srvaldez, included in FB examples]]
 	[[http://www.freebasic.net/forum/viewtopic.php?p=26794|CRC Calculation by Fragmeister]]
-
+	
 	==Physics simulation==
 	[[http://www.freebasic.net/forum/viewtopic.php?t=3167|Atom smash simulation by coderjeff]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=3428|2d rigid body library by coderjeff]]
@@ -76,7 +75,6 @@
 	[[http://games.freebasic.net/|FreeBASIC Games Directory by Lachie Dazdarian]]
 	
 	==Featured Games:==
-	[[http://csgp.suret.net/|Cute Short Game Project by redcrab]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=3931|Kingdoms by Piptol]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=5068|Lynn's Legacy by cha0s and Josiah Tobin]]
 	[[http://cs.smu.ca/~c_adams1/relativity/|Relativity by Lithium]]
@@ -123,7 +121,7 @@
 	==Linux==
 	[[http://www.freebasic.net/forum/viewtopic.php?t=8040|Printing on Linux by coderJeff]]
 	[[http://www.freebasic.net/forum/viewtopic.php?t=7611|Using GfxLib on Gtk by caseih]]
-
+	
 	==DOS==
 	[[http://www.freebasic.net/forum/viewtopic.php?p=70185|Detect system codepage by DrV]]
 	[[http://www.freebasic.net/forum/viewtopic.php?p=5993|Calling an Interrupt requiring a pointer by DrV]]
@@ -153,8 +151,7 @@
 	[[ExtLibTOC|External Library Documentation]]
 	[[http://www.sourceforge.net/|Sourceforge]]
 	[[http://games.freebasic.net/|FreeBASIC Games Directory]]
-
-<<::c::
+>>::c::
 This is a place to post worthy projects/code snippets for ""FreeBASIC"", in their relative categories.  To add a page, link to either its wiki page, website, or thread on the ""FreeBASIC"" Forums.  State the project name and who it's by.  Sections may be broken down into their own separate pages some time in the future.  Note:  Due to FB being in Beta stage of development, earlier coded projects may need to be reconfigured or recompiled to work on later versions of ""FreeBASIC"".
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

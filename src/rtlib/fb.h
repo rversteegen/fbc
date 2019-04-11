@@ -86,7 +86,7 @@
 #define MIN(a,b)		((a) < (b) ? (a) : (b))
 #define MAX(a,b)		((a) > (b) ? (a) : (b))
 #define MID(a,b,c)		MIN(MAX((a), (b)), (c))
-#define CINT(x)			((x) > 0.0 ? (int)(x) + 0.5 : (int)(x - 0.5))
+#define CINT(x)			((x) > 0.0 ? (int)((x) + 0.5) : (int)((x) - 0.5))
 
 #define SWAP(a,b)		((a) ^= (b), (b) ^= (a), (a) ^= (b))
 
@@ -105,17 +105,21 @@
 	#define alloca(x) __builtin_alloca(x)
 #endif
 
-#if defined ENABLE_MT && !defined HOST_DOS && !defined HOST_XBOX
+#if defined ENABLE_MT && !defined HOST_XBOX
 	FBCALL void fb_Lock( void );
 	FBCALL void fb_Unlock( void );
 	FBCALL void fb_StrLock( void );
 	FBCALL void fb_StrUnlock( void );
 	FBCALL void fb_GraphicsLock  ( void );
 	FBCALL void fb_GraphicsUnlock( void );
+	/* NOTE: if both locks are acquired, FB_LOCK() must be called before
+           FB_STRLOCK() in order to avoid deadlocking */
 	#define FB_LOCK()      fb_Lock()
 	#define FB_UNLOCK()    fb_Unlock()
 	#define FB_STRLOCK()   fb_StrLock()
 	#define FB_STRUNLOCK() fb_StrUnlock()
+	/* FIXME: consistent locking order of FB_LOCK and FB_GRAPHICS_LOCK is
+           required. See bug #885 */
 	#define FB_GRAPHICS_LOCK()   fb_GraphicsLock()
 	#define FB_GRAPHICS_UNLOCK() fb_GraphicsUnlock()
 #else
@@ -428,6 +432,8 @@ void                fb_hListDynElemRemove   ( FB_LIST *list, FB_LISTELEM *elem )
 #define KEY_F8          FB_MAKE_EXT_KEY( 'B' )
 #define KEY_F9          FB_MAKE_EXT_KEY( 'C' )
 #define KEY_F10         FB_MAKE_EXT_KEY( 'D' )
+#define KEY_F11         FB_MAKE_EXT_KEY( 'E' )
+#define KEY_F12         FB_MAKE_EXT_KEY( 'F' )
 #define KEY_HOME        FB_MAKE_EXT_KEY( 'G' )
 #define KEY_UP          FB_MAKE_EXT_KEY( 'H' )
 #define KEY_PAGE_UP     FB_MAKE_EXT_KEY( 'I' )

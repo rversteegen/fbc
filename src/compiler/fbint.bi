@@ -480,6 +480,11 @@ enum FB_TOKEN
 	FB_TK_PAINT
 	FB_TK_DRAW
 	FB_TK_IMAGECREATE
+
+	FB_TK_CVA_START
+	FB_TK_CVA_ARG
+	FB_TK_CVA_END
+	FB_TK_CVA_COPY
     
     FB_TK_THREADCALL
 
@@ -555,6 +560,10 @@ enum FB_TARGETOPT
 	'' Whether the stack needs to be aligned to 16 bytes before any
 	'' call to external code (x86/x86_64 GNU/Linux and Darwin)
 	FB_TARGETOPT_STACKALIGN16        = &h00000020
+
+	FB_TARGETOPT_ELF   = &h00000040
+	FB_TARGETOPT_COFF  = &h00000080
+	FB_TARGETOPT_MACHO = &h00000100
 end enum
 
 type FBTARGET
@@ -612,8 +621,9 @@ type FBENV
 	ppfile_num		as integer					'' -pp output file
 
 	'' include files
-	incfilehash		as THASH
-	inconcehash		as THASH
+	filenamehash		as THASH
+	incfilehash		as THASH					'' A subset of filenamehash
+	inconcehash		as THASH					'' A subset of filenamehash
 	includerec		as integer					'' >0 if parsing an include file
 
 	entry			as zstring * FB_MAXNAMELEN	'' name of main function if overridden
@@ -639,9 +649,6 @@ declare function fbGetInputFileParentDir( ) as string
 declare sub fbAddLib(byval libname as zstring ptr)
 declare sub fbAddLibPath(byval path as zstring ptr)
 
-''
-'' super globals
-''
-common shared as FBENV env
+extern env as FBENV
 
 #endif ''__FBINT_BI__

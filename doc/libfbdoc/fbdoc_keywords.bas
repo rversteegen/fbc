@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -79,7 +79,12 @@ namespace fb.fbdoc
 
 		keyworddata = LoadFileAsString( sFileName )
 
-		keywordhash.alloc( 1000 )
+		keywordhash.alloc( 2000 )
+
+		if( keyworddata = "" ) then
+			print "Unable to open keywords file " & *sFileName 
+			return 0
+		end if
 
 		dim as integer n, b
 		dim as ubyte ptr p

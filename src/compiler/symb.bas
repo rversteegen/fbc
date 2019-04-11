@@ -46,6 +46,8 @@ declare sub 		symbCompRTTIEnd		( )
 
 declare sub 		symbKeywordConstsInit ( )
 
+declare sub			symbKeywordTypeInit	( )    
+
 declare function hGetNamespacePrefix( byval sym as FBSYMBOL ptr ) as string
 
 ''globals
@@ -163,6 +165,9 @@ sub symbInit _
 
 	''
 	symbKeywordConstsInit( )
+
+	''
+	symbKeywordTypeInit( )
 
     ''
     symb.inited = TRUE
@@ -1460,12 +1465,18 @@ function symbCloneSymbol( byval s as FBSYMBOL ptr ) as FBSYMBOL ptr
     	function = symbCloneLabel( s )
 
 	case FB_SYMBCLASS_STRUCT
-		'' Assuming only array descriptor types will ever be cloned
-		'' (most other structs would be too complex, especially classes)
-		assert( symbIsDescriptor( s ) )
 
-		symbGetDescTypeArrayDtype( s, arraydtype, arraysubtype )
-		function = symbAddArrayDescriptorType( symbGetDescTypeDimensions( s ), arraydtype, arraysubtype )
+		'' Assuming only simple UDTS (like array descriptor types) will ever be cloned
+		'' (most other structs would be too complex, especially classes)
+
+		assert( (s->udt.ext = NULL) )
+		
+		if( symbIsDescriptor( s ) ) then
+			symbGetDescTypeArrayDtype( s, arraydtype, arraysubtype )
+			function = symbAddArrayDescriptorType( symbGetDescTypeDimensions( s ), arraydtype, arraysubtype )
+		else
+			function = symbCloneSimpleStruct( s )
+		end if
 
     case else
 		assert( FALSE )
@@ -1575,6 +1586,90 @@ function symbIsString _
 	case else
 		function = FALSE
 	end select
+
+end function
+
+'':::::
+function symbGetValistType _
+	( _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr _
+	) as FB_CVA_LIST_TYPEDEF
+
+	'' use dtype/subtype to determine what kind
+	'' of __builtin_va_list we have, or maybe none
+	''
+	'' if gcc's builtin va_list is a pointer type, then it must
+	'' have the mangle modifer on the dtype to get recognized.
+	''
+	'' if it's just an ANY PTR with out any mangle modifer
+	'' then it might be used for va_list on the target, 
+	'' but we don't know, and it doesn't matter anyway
+	'' so just return FB_CVA_LIST_NONE
+	''
+	'' for va_list structure type, we might be looking at a dtype
+	'' with a UDT subtype, or we might be looking at the UDT
+	'' itself.  Either way, we must look at the UDT itself to
+	'' determine if it is a struct or struct array type using
+	''   - symbGetUdtIsValistStruct()
+	''   - symbGetUdtIsValistStructArray()
+
+	'' Determine the following:
+	''   1) va_list type?  (any target/va_list type)
+	''   2) is a __builtin_va_list type? (gcc)
+	''   3) is a struct type, or an array struct type? (gcc)
+	
+	function = FB_CVA_LIST_NONE
+
+	'' mangle modifier?
+	if( typeGetMangleDt( dtype ) = FB_DATATYPE_VA_LIST ) then
+		select case typeGetDtOnly( dtype )
+		case FB_DATATYPE_VOID
+			if( typeIsPtr( dtype ) ) then
+				function = FB_CVA_LIST_BUILTIN_POINTER
+			end if
+
+		case FB_DATATYPE_STRUCT
+			if( subtype ) then
+				if( symbGetUdtIsValistStruct( subtype ) ) then
+					if( symbGetUdtIsValistStructArray( subtype ) ) then
+						function = FB_CVA_LIST_BUILTIN_C_STD
+					else
+						function = FB_CVA_LIST_BUILTIN_AARCH64
+					end if
+				end if
+			end if
+
+		case else
+			if( typeGetClass( dtype ) = FB_DATACLASS_INTEGER ) then
+				if( typeIsPtr( dtype ) ) then
+					function = FB_CVA_LIST_POINTER
+				end if
+			end if
+
+		end select
+
+	'' maybe subtype has the information
+	elseif( subtype ) then
+
+		select case typeGetDtOnly( symbGetFullType( subtype ) )
+		case FB_DATATYPE_VOID
+			if( typeGetMangleDt( symbGetFullType( subtype ) ) = FB_DATATYPE_VA_LIST ) then
+				function = FB_CVA_LIST_BUILTIN_POINTER
+			end if
+
+		case FB_DATATYPE_STRUCT
+			if( symbGetUdtIsValistStruct( subtype ) ) then
+				if( symbGetUdtIsValistStructArray( subtype ) ) then
+					function = FB_CVA_LIST_BUILTIN_C_STD
+				else
+					function = FB_CVA_LIST_BUILTIN_AARCH64
+				end if
+			end if
+
+		end select
+
+	end if
 
 end function
 
@@ -1870,7 +1965,7 @@ function symbCheckAccess( byval sym as FBSYMBOL ptr ) as integer
 	function = FALSE
 end function
 
-function symbCheckConstAssign _
+function symbCheckConstAssignTopLevel _
 	( _
 		byval ldtype as FB_DATATYPE, _
 		byval rdtype as FB_DATATYPE, _
@@ -1977,6 +2072,129 @@ function symbCheckConstAssign _
 	function = TRUE
 end function
 
+private function hSymbCheckConstAssignFuncPtr _
+	( _
+		byval ldtype as FB_DATATYPE, _
+		byval rdtype as FB_DATATYPE, _
+		byval lsubtype as FBSYMBOL ptr, _
+		byval rsubtype as FBSYMBOL ptr, _
+		byval mode as FB_PARAMMODE = 0, _
+		byref matches as integer = 0, _
+		byref wrnmsg as FB_WARNINGMSG = 0 _
+	) as integer
+
+	'' return value:
+	'' TRUE = assignment is comatible
+	'' FALSE = assignment is not compatible
+
+	function = FALSE
+
+	'' TODO
+	'' 1) consider also combining (in some way) with symbCalcProcMatch()
+	'' 2) the structure of the call is very similar
+	'' 3) possibly leading towards a generic type compatibility check
+
+	assert( typeGetDtOnly( ldType ) = FB_DATATYPE_FUNCTION )
+	assert( typeGetDtOnly( rdType ) = FB_DATATYPE_FUNCTION )
+	assert( symbIsProc( lsubtype ) )
+	assert( symbIsProc( rsubtype ) )
+
+	'' Return warnings even though some checks are not CONSTness releated.  We could
+	'' promote them to errors, but that will cause many tests to break, and really, we are
+	'' not specifically checking the assignment, but rather the function pointer compatibility.
+	'' So we should get a suspicious pointer warning anyway, plus one of these here.
+
+	'' similar to symbCalcProcMatch(), however, only checking function pointer assignments.
+
+	'' check for identical return type
+	var match = typeCalcMatch( lsubtype->typ, lsubtype->subtype, _
+			iif( symbIsRef( lsubtype ), FB_PARAMMODE_BYREF, FB_PARAMMODE_BYVAL ), _
+			rsubtype->typ, rsubtype->subtype )
+	if( match = FB_OVLPROC_NO_MATCH ) then
+		wrnmsg = FB_WARNINGMSG_RETURNTYPEMISMATCH
+		exit function
+	end if
+
+	'' Does one have a BYREF result, but not the other?
+	if( symbIsRef( lsubtype ) <> symbIsRef( rsubtype ) ) then
+		wrnmsg = FB_WARNINGMSG_RETURNMETHODMISMATCH
+		exit function
+	end if
+
+	'' Different calling convention?
+	if( symbAreProcModesEqual( lsubtype, rsubtype ) = FALSE ) then
+		wrnmsg = FB_WARNINGMSG_CALLINGCONVMISMATCH
+		exit function
+	end if
+
+	'' not same number of args
+	if( symbGetProcParams( lsubtype ) <> symbGetProcParams( rsubtype ) ) then
+		wrnmsg = FB_WARNINGMSG_ARGCNTMISMATCH
+		exit function
+	end if
+
+	'' Check each parameter
+	var lparam = symbGetProcHeadParam( lsubtype )
+	var rparam = symbGetProcHeadParam( rsubtype )
+
+	while( lparam )
+
+		'' reverse the assignment checking parameter vs parameter
+		'' we want to check that it is safe to access argument using
+		'' right hand side parameter type, as if we were assigning
+		'' left side to right side.
+		var r = symbGetFullType( lparam )
+		var l = symbGetFullType( rparam )
+		var rs = symbGetSubType( lparam )
+		var ls = symbGetSubType( rparam )
+		var m = symbGetParamMode( lparam )
+
+		if( symbCheckConstAssign( l, r, ls, rs, m, , wrnmsg ) = FALSE ) then
+			exit function
+		end if
+
+		lparam = lparam->next
+		rparam = rparam->next
+	wend
+
+	function = TRUE
+end function
+
+function symbCheckConstAssign _
+	( _
+		byval ldtype as FB_DATATYPE, _
+		byval rdtype as FB_DATATYPE, _
+		byval lsubtype as FBSYMBOL ptr, _
+		byval rsubtype as FBSYMBOL ptr, _
+		byval mode as FB_PARAMMODE = 0, _
+		byref matches as integer = 0, _
+		byref wrnmsg as FB_WARNINGMSG = 0 _
+	) as integer
+
+	'' TODO:
+	'' 1) consider combining 
+	''      - symbCheckConstAssign()
+	''      - hSymbCheckConstAssignFuncPtr()
+	''      - symbCheckConstAssignTopLevel()
+	'' 2) callers of symbCheckConstAssignTopLevel() need to respond to errors 
+	''    and warnings if calling symbCheckConstAssign() instead
+
+	dim ret as integer = any
+
+	'' check top-level const
+	ret = symbCheckConstAssignTopLevel( ldtype, rdtype, lsubtype, rsubtype, mode, matches )
+	
+	if( ret ) then
+		'' both types function pointer?
+		if( ( typeGetDtOnly( ldType ) = FB_DATATYPE_FUNCTION ) and ( typeGetDtOnly( rdType ) = FB_DATATYPE_FUNCTION ) ) then
+			ret and= hSymbCheckConstAssignFuncPtr( ldtype, rdtype, lsubtype, rsubtype, mode, matches, wrnmsg )
+		end if
+	end if
+
+	function = ret
+
+end function
+
 private sub hForEachGlobal _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -2058,7 +2276,7 @@ static shared as zstring ptr classnames(FB_SYMBCLASS_VAR to FB_SYMBCLASS_NSIMPOR
 }
 
 '' For debugging
-function typeDump _
+function typeDumpToStr _
 	( _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr _
@@ -2099,6 +2317,23 @@ function typeDump _
 				dump += "<invalid dtype " & dtypeonly & ">"
 			end if
 		end select
+
+		if( typeHasMangleDt( dtype ) ) then
+			dump += " alias """
+
+			select case typeGetMangleDt( dtype )
+			case FB_DATATYPE_CHAR
+				dump += "char"
+			case FB_DATATYPE_INTEGER, FB_DATATYPE_UINT
+				dump += "long"
+			case FB_DATATYPE_VA_LIST
+				dump += "va_list"
+			case else
+				dump += "<" & typeGetMangleDt( dtype ) & ">"
+			end select
+
+			dump += """"
+		end if
 
 		'' UDT name
 		select case( typeGetDtOnly( dtype ) )
@@ -2177,6 +2412,10 @@ function typeDump _
 	function = dump
 end function
 
+sub typeDump( byval dtype as integer, byval subtype as FBSYMBOL ptr )
+	print typeDumpToStr( dtype, subtype )
+end sub
+
 private sub hDumpName( byref s as string, byval sym as FBSYMBOL ptr )
 	if( sym = @symbGetGlobalNamespc( ) ) then
 		s += "<global namespace>"
@@ -2202,7 +2441,7 @@ private sub hDumpName( byref s as string, byval sym as FBSYMBOL ptr )
 #endif
 end sub
 
-function symbDump( byval sym as FBSYMBOL ptr ) as string
+function symbDumpToStr( byval sym as FBSYMBOL ptr ) as string
 	dim as string s
 
 	if( sym = NULL ) then
@@ -2242,7 +2481,7 @@ function symbDump( byval sym as FBSYMBOL ptr ) as string
 	if( symbIsProc( sym ) ) then
 		checkAttrib( METHOD )
 	else
-		checkAttrib( PARAMINSTANCE )
+		checkAttrib( INSTANCEPARAM )
 	end if
 	checkAttrib( CONSTRUCTOR )
 	checkAttrib( DESTRUCTOR )
@@ -2267,6 +2506,7 @@ function symbDump( byval sym as FBSYMBOL ptr ) as string
 	end if
 	checkAttrib( ABSTRACT )
 	checkAttrib( VIRTUAL )
+	checkAttrib( NOTHISCONSTNESS )
 #endif
 
 #if 1
@@ -2319,7 +2559,7 @@ function symbDump( byval sym as FBSYMBOL ptr ) as string
 
 	if( sym->class = FB_SYMBCLASS_NSIMPORT ) then
 		s += "from: "
-		s += symbDump( sym->nsimp.imp_ns )
+		s += symbDumpToStr( sym->nsimp.imp_ns )
 		return s
 	end if
 
@@ -2339,7 +2579,7 @@ function symbDump( byval sym as FBSYMBOL ptr ) as string
 		s += "("
 		var param = symbGetProcHeadParam( sym )
 		while( param )
-			s += symbDump( param )
+			s += symbDumpToStr( param )
 			param = param->next
 			if( param ) then
 				s += ", "
@@ -2417,10 +2657,10 @@ function symbDump( byval sym as FBSYMBOL ptr ) as string
 			case FB_DATATYPE_ENUM
 				s += "<enum>"
 			case else
-				s += typeDump( sym->typ, NULL )
+				s += typeDumpToStr( sym->typ, NULL )
 			end select
 		else
-			s += typeDump( sym->typ, sym->subtype )
+			s += typeDumpToStr( sym->typ, sym->subtype )
 		end if
 	end if
 
@@ -2435,6 +2675,10 @@ function symbDump( byval sym as FBSYMBOL ptr ) as string
 	function = s
 end function
 
+sub symbDump( byval sym as FBSYMBOL ptr )
+	print symbDumpToStr( sym )
+end sub
+
 sub symbDumpNamespace( byval ns as FBSYMBOL ptr )
 	select case( ns->class )
 	case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_ENUM, FB_SYMBCLASS_NAMESPACE
@@ -2443,11 +2687,11 @@ sub symbDumpNamespace( byval ns as FBSYMBOL ptr )
 		print "symbDumpNamespace(): not a namespace"
 	end select
 
-	print symbDump( ns ) + ":"
+	print symbDumpToStr( ns ) + ":"
 
 	var i = symbGetCompSymbTb( ns ).head
 	while( i )
-		print "    symtb: " + symbDump( i )
+		print "    symtb: " + symbDumpToStr( i )
 		i = i->next
 	wend
 
@@ -2465,10 +2709,10 @@ sub symbDumpNamespace( byval ns as FBSYMBOL ptr )
 			''   other symbols   = shadowed symbols from parent scopes
 			dim as FBSYMBOL ptr sym = hashitem->data
 			var bucketprefix = "    hashtb[" & index & "]: "
-			print bucketprefix + *hashitem->name + " = " + symbDump( sym )
+			print bucketprefix + *hashitem->name + " = " + symbDumpToStr( sym )
 			while( sym->hash.next )
 				sym = sym->hash.next
-				print space(len(bucketprefix)) + "next: " + symbDump( sym )
+				print space(len(bucketprefix)) + "next: " + symbDumpToStr( sym )
 			wend
 			hashitem = hashitem->next
 		wend
@@ -2485,7 +2729,7 @@ sub symbDumpChain( byval chain_ as FBSYMCHAIN ptr )
 		do
 			var sym = chain_->sym
 			do
-				print "   " & i & "  " + symbDump( sym )
+				print "   " & i & "  " + symbDumpToStr( sym )
 				sym = sym->hash.next
 			loop while( sym )
 			i += 1
@@ -2515,6 +2759,6 @@ dim shared as zstring ptr classnamesPretty(FB_SYMBCLASS_VAR to FB_SYMBCLASS_NSIM
 	@"namespace import" _
 }
 
-function symbDumpPretty( byval sym as FBSYMBOL ptr ) as string
+function symbDumpPrettyToStr( byval sym as FBSYMBOL ptr ) as string
 	function = *classnamesPretty(sym->class) + " " + *sym->id.name
 end function

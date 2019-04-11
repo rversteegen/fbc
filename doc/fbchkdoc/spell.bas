@@ -1,5 +1,5 @@
 ''  fbchkdoc - FreeBASIC Wiki Management Tools
-''	Copyright (C) 2008 Jeffery R. Marshall (coder[at]execulink[dot]com)
+''	Copyright (C) 2008-2019 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -22,16 +22,14 @@
 '' fbdoc headers
 #include once "CWiki.bi"
 #include once "CWikiCache.bi"
-#include once "CRegex.bi"
-#include once "list.bi"
 #include once "hash.bi"
 #include once "fbdoc_defs.bi"
 #include once "fbdoc_keywords.bi"
-#include once "COptions.bi"
 
 '' fbchkdoc headers
 #include once "fbchkdoc.bi"
 #include once "funcs.bi"
+#include once "cmd_opts.bi"
 #include once "spellcheck.bi"
 
 '' libs
@@ -49,6 +47,8 @@ dim shared wordhash as HASH
 dim shared CurrentPage as string
 dim shared haveTitle as integer
 dim shared counter as integer
+
+'' --------------------------------------------------------
 
 ''
 function IsKeyword( byref word as string ) as integer
@@ -92,6 +92,8 @@ end function
 function IsUrl( byref word as string ) as integer
 	if( lcase(left( word, 7 )) = "http://" ) then
 		function = TRUE
+	elseif( lcase(left( word, 8 )) = "https://" ) then
+		function = TRUE
 	else
 		function = FALSE
 	end if
@@ -122,7 +124,7 @@ function GetWord( byref text as string, byref i as integer, byref j as integer )
 		wend
 
 		if( j <= len(text) ) then
-			if( lcase(mid( text, j, i - j + 1 )) = "http:" ) then
+			if( (lcase(mid( text, j, i - j + 1 )) = "http:") or (lcase(mid( text, j, i - j + 1 )) = "https:") ) then
 				while( i <= len(text) )
 					if( instr( numbers + letters + ":.%/" + "_", mid( text, i , 1 )) <> 0 ) then
 						i += 1
@@ -151,7 +153,7 @@ end function
 ''
 function DoSpellCheckWord( byref word as string ) as integer
 
-	if( SpellCheck_WordCorrect(word) = TRUE ) then
+	if( SpellCheck_WordCorrect(word) ) then
 		function = TRUE
 	elseif( IsKeyword( word ) ) then
 		function = TRUE
@@ -347,109 +349,51 @@ end function
 '' MAIN
 '' --------------------------------------------------------
 
-dim as string cache_dir, def_cache_dir, web_cache_dir, dev_cache_dir
+'' enable url and cache
+cmd_opts_init( CMD_OPTS_ENABLE_CACHE or CMD_OPTS_ENABLE_AUTOCACHE or CMD_OPTS_ENABLE_MANUAL )
 
-dim as integer i = 1, webPageCount = 0
-redim webPageList(1 to 1) as string
-dim as string cmt
+dim i as integer = 1
+while( command(i) > "" )
+	if( cmd_opts_read( i ) ) then
+		continue while
+	elseif( left( command(i), 1 ) = "-" ) then
+		cmd_opts_unrecognized_die( i )
+	else
+		cmd_opts_unexpected_die( i )
+	end if
+	i += 1
+wend	
 
-if( command(i) = "" ) then
+if( app_opt.help ) then
 	print "spell [pages] [@pagelist] [options]"
 	print
-	print "   pages      list of wiki pages on the command line"
-	print "   @pagelist	 text file with a list of pages, one per line"
+	cmd_opts_show_help( "spellcheck" )
 	print
-	print "   -web       spellcheck files in cache_dir"
-	print "   -web+      spellcheck files in web cache_dir"
-	print "   -dev       spellcheck files in cache_dir"
-	print "   -dev+      spellcheck files in dev cache_dir"
 	end 0
 end if
 
-'' read defaults from the configuration file (if it exists)
-scope
-	dim as COptions ptr opts = new COptions( default_optFile )
-	if( opts <> NULL ) then
-		def_cache_dir = opts->Get( "cache_dir", default_CacheDir )
-		web_cache_dir = opts->Get( "web_cache_dir", default_web_CacheDir )
-		dev_cache_dir = opts->Get( "dev_cache_dir", default_dev_CacheDir )
-		delete opts
-	else
-		'' print "Warning: unable to load options file '" + default_optFile + "'"
-		'' end 1
-		def_cache_dir = default_CacheDir
-		web_cache_dir = default_web_CacheDir
-		dev_cache_dir = default_dev_CacheDir
-	end if
-end scope
+cmd_opts_resolve()
+cmd_opts_check()
 
-while command(i) > ""
-	if( left(command(i), 1) = "-" ) then
-		select case lcase(command(i))
-		case "-web", "-dev"
-			cache_dir = def_cache_dir
-		case "-web+"
-			cache_dir = web_cache_dir
-		case "-dev+"
-			cache_dir = dev_cache_dir
-		case else
-			print "Unrecognized option '" + command(i) + "'"
-			end 1
-		end select
-	else
-		if left( command(i), 1) = "@" then
-			scope
-				dim h as integer, x as string
-				h = freefile
-				if open( mid(command(i),2) for input access read as #h ) <> 0 then
-					print "Error reading '" + command(i) + "'"
-				else
-					while eof(h) = 0
-						line input #h, x
-						x = ParsePageName( x, cmt )
-						if( x > "" ) then 
-							webPageCount += 1
-							if( webPageCount > ubound(webPageList) ) then
-								redim preserve webPageList(1 to Ubound(webPageList) * 2)
-							end if
-							webPageList(webPageCount) = x
-						end if
-					wend
-					close #h
-				end if
-			end scope
-		else
-			webPageCount += 1
-			if( webPageCount > ubound(webPageList) ) then
-				redim preserve webPageList(1 to Ubound(webPageList) * 2)
-			end if
-			webPageList(webPageCount) = command(i)		
-		end if
-	end if
-	i += 1
-wend
-
-if( webPageCount = 0 ) then
+'' no pages? nothing to do...
+if( app_opt.webPageCount = 0 ) then
 	print "no pages specified."
 	end 1
 end if
 
+'' --------------------------------------------------------
+
 dim as CWikiCache ptr wikicache
 dim as string sPage, sBody
 
-if( cache_dir = "" ) then
-	cache_dir = default_CacheDir
-end if
-print "cache: "; cache_dir
-
 '' Initialize the cache
-wikicache = new CWikiCache( cache_dir, CWikiCache.CACHE_REFRESH_NONE )
+wikicache = new CWikiCache( app_opt.cache_dir, CWikiCache.CACHE_REFRESH_NONE )
 if wikicache = NULL then
-	print "Unable to use local cache dir " + cache_dir
+	print "Unable to use local cache dir " + app_opt.cache_dir
 	end 1
 end if
 
-if( webPageCount > 0 ) then
+if( app_opt.webPageCount > 0 ) then
 	dim as integer i, h, h2
 	dim as string ret
 
@@ -486,15 +430,15 @@ if( webPageCount > 0 ) then
 		end if
 	end scope
 
-	fb.fbdoc.fbdoc_loadkeywords( "../manual/templates/default/keywords.lst" )
+	FormatFbCodeLoadKeywords( app_opt.manual_dir & "templates/default/keywords.lst" )
 	SpellCheck_Init( "en_US" )
 
 ''	h = freefile
 ''	open "spellcheck.txt" for output as #h
 
-	for i = 1 to webPageCount
+	for i = 1 to app_opt.webPageCount
 
-		sPage = webPageList(i)
+		sPage = app_opt.webPageList(i)
 
 		CurrentPage = sPage
 		haveTitle = FALSE

@@ -90,8 +90,8 @@ private function astNewJMPTB _
 		byval labels1 as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr n = any, tree = any
@@ -124,8 +124,8 @@ private function astNewJMPTB _
 	n->jmptb.labels = labels
 	n->jmptb.labelcount = labelcount
 	n->jmptb.deflabel = deflabel
-	n->jmptb.minval = minval
-	n->jmptb.maxval = maxval
+	n->jmptb.bias = bias
+	n->jmptb.span = span
 
 	function = astNewLINK( tree, n )
 end function
@@ -139,13 +139,24 @@ function astLoadJMPTB( byval n as ASTNODE ptr ) as IRVREG ptr
 	if( ast.doemit ) then
 		irEmitJMPTB( v1, n->sym, n->jmptb.values, n->jmptb.labels, _
 		             n->jmptb.labelcount, n->jmptb.deflabel, _
-		             n->jmptb.minval, n->jmptb.maxval )
+		             n->jmptb.bias, n->jmptb.span )
 	end if
 
 	deallocate( n->jmptb.values )
 	deallocate( n->jmptb.labels )
 
 	function = NULL
+end function
+
+'' Pre-calculate -bias * sizeof(ptr) as Long value, because the offset in an
+'' x86 IDX expression is signed 32bit.
+private function hPrecalcBiasOffset( byval bias as ulongint, byval dtype as integer ) as longint
+	astBeginHideWarnings( )
+	var t = astNewCONSTi( bias, dtype )
+	t = astNewUOP( AST_OP_NEG, t )
+	t = astNewBOP( AST_OP_MUL, t, astNewCONSTi( env.pointersize, dtype ) )
+	function = astConstFlushToInt( t, FB_DATATYPE_LONG )
+	astEndHideWarnings( )
 end function
 
 function astBuildJMPTB _
@@ -155,8 +166,8 @@ function astBuildJMPTB _
 		byval labels1 as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr tree = any, l = any
@@ -208,19 +219,26 @@ function astBuildJMPTB _
 
 		'' if( expr < minval or expr > maxval ) then goto deflabel
 		'' optimised to:
-		'' if( cunsg(expr - minval) > (maxval - minval) ) then goto deflabel
+		'' if( cunsg(expr - bias) > (span) ) then goto deflabel
 		tree = astNewLINK( tree, _
 			astNewBOP( AST_OP_GT, _
 				astNewBOP( AST_OP_SUB, _
 					astNewVAR( tempvar ), _
-					astNewCONSTi( minval, dtype ) ), _
-				astNewCONSTi( maxval - minval, dtype ), _
+					astNewCONSTi( bias, dtype ) ), _
+				astNewCONSTi( span, dtype ), _
 				deflabel, AST_OPOPT_NONE ) )
 
-		'' goto table[expr - minval]
+		'' Do
+		''    goto table[expr - bias]
+		'' by using an IDX
+		''    goto [table  +  expr * sizeof(ptr)  +  -bias * sizeof(ptr)]
+		''    goto [table + expr*4 + 16]
+		''    goto [table + expr*4 - 16]
+		'' instead of DEREF-BOP-ADDROF (IDX gives better code currently).
 		tree = astNewLINK( tree, _
 			astNewBRANCH( AST_OP_JUMPPTR, NULL, _
-				astNewIDX( astNewVAR( tbsym, -minval * env.pointersize ), _
+				astNewIDX( _
+					astNewVAR( tbsym, hPrecalcBiasOffset( bias, dtype ) ), _
 					astNewBOP( AST_OP_MUL, _
 						astNewVAR( tempvar ), _
 						astNewCONSTi( env.pointersize, dtype ) ) ) ) )
@@ -230,7 +248,7 @@ function astBuildJMPTB _
 
 	tree = astNewLINK( tree, _
 		astNewJMPTB( astNewVAR( tempvar ), tbsym, _
-			values1, labels1, labelcount, deflabel, minval, maxval ) )
+			values1, labels1, labelcount, deflabel, bias, span ) )
 
 	function = tree
 end function

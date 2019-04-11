@@ -77,7 +77,7 @@ sub symbGetDescTypeArrayDtype _
 	fld = symbUdtGetFirstField( desctype )
 	assert( typeIsPtr( symbGetType( fld ) ) )
 
-	arraydtype = typeDeref( symbGetType( fld ) )
+	arraydtype = typeDeref( symbGetFullType( fld ) )
 	arraysubtype = fld->subtype
 
 end sub
@@ -160,10 +160,11 @@ function symbAddArrayDescriptorType _
 	'' Some unique internal id that allows this descriptor type to be looked
 	'' up later when we need one with the same dimensions & array dtype
 	'' again. '$' prefix ensures that there are no collisions with user's
-	'' ids.
+	'' ids.  Always keep the top-level const for array datatypes to avoid
+	'' conflicts between types differing only by const.
 	id = "$" + aliasid
 	id += "<"
-	symbMangleType( id, arraydtype, arraysubtype )
+	symbMangleType( id, arraydtype, arraysubtype, FB_MANGLEOPT_KEEPTOPCONST )
 	symbMangleResetAbbrev( )
 	id += ">"
 
@@ -711,6 +712,28 @@ function symbGetRealSize( byval sym as FBSYMBOL ptr ) as longint
 	size *= symbGetArrayElements( sym )
 	function = size
 end function
+
+sub symbGetRealType( byval sym as FBSYMBOL ptr, byref dtype as integer, byref subtype as FBSYMBOL ptr )
+	assert( symbIsVar( sym ) or symbIsField( sym ) )
+	dtype = symbGetFullType( sym )
+	subtype = sym->subtype
+	if( symbIsParam( sym ) ) then
+		dim parammode as integer
+		dim bydescrealsubtype as FBSYMBOL ptr
+		if( symbIsParamByref( sym ) ) then
+			parammode = FB_PARAMMODE_BYREF
+		elseif( symbIsParamBydesc( sym ) ) then
+			parammode = FB_PARAMMODE_BYDESC
+			bydescrealsubtype = sym->var_.array.desctype
+		else
+			assert( symbIsParamByval( sym ) )
+			parammode = FB_PARAMMODE_BYVAL
+		end if
+		symbGetRealParamDtype( parammode, bydescrealsubtype, dtype, subtype )
+	elseif( symbIsRef( sym ) or symbIsImport( sym ) ) then
+		dtype = typeAddrOf( dtype )
+	end if
+end sub
 
 '' Calculate a static array's total number of elements, all dimensions together.
 '' <first> may be specified to calculate only the elements for <first> and the

@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ namespace fb
 	type CRegexCtx_
 		as pcre ptr 		reg
 		as pcre_extra ptr extra
-		as integer ptr 		vectb
+		as long ptr 		vectb
 		as zstring ptr 		subject
 		as integer 			sublen
 		as integer 			substrcnt
@@ -45,7 +45,7 @@ namespace fb
 		)
 		
 		dim as zstring ptr err_msg
-		dim as integer err_ofs
+		dim as long err_ofs
 		
 		ctx = new CRegexCtx
 
@@ -56,7 +56,7 @@ namespace fb
 		ctx->extra = pcre_study( ctx->reg, 0, @err_msg )
 		pcre_fullinfo( ctx->reg, ctx->extra, PCRE_INFO_CAPTURECOUNT, @ctx->substrcnt )
 		ctx->substrcnt += 1
-		ctx->vectb = allocate( len( integer ) * (3 * ctx->substrcnt) )
+		ctx->vectb = allocate( sizeof( *ctx->vectb ) * (3 * ctx->substrcnt) )
 		ctx->substrlist = NULL
 		ctx->subject = NULL
 		ctx->sublen = 0

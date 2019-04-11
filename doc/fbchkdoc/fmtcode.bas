@@ -1,5 +1,5 @@
 ''  fbchkdoc - FreeBASIC Wiki Management Tools
-''	Copyright (C) 2008 Jeffery R. Marshall (coder[at]execulink[dot]com)
+''	Copyright (C) 2008-2019 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include once "CFbCode.bi"
 #include once "fbdoc_string.bi"
 #include once "fbdoc_keywords.bi"
+#include once "fbchkdoc.bi"
 
 declare function _LookUpAttrib( byval attrib as integer ) as integer
 declare function _emitCode ( byref text as string ) as string
@@ -135,17 +136,29 @@ private function _emitCode ( byref text as string ) as string
 
 end function
 
-'' main entry point
-function FormatFbCode( byref txt as string ) as string
-	
+''
+function FormatFbCodeLoadKeywords( byref filename as string ) as boolean
+
 	static kw_loaded as integer = FALSE
 
 	if( kw_loaded = FALSE ) then
 		'' Load the keywords, this will allow keywords to be cased.
-		fbdoc_loadkeywords( "../manual/templates/default/keywords.lst" )
+
+		if( filename = "" ) then
+			filename = hardcoded.default_manual_dir + "templates/default/keywords.lst"
+		end if
+		function = ( fbdoc_loadkeywords( filename ) <> 0 )
+
 		kw_loaded = TRUE
+
 	end if
+
+end function
+
+'' main entry point
+function FormatFbCode( byref txt as string ) as string
 
 	function = _emitCode( txt )
 
 end function
+

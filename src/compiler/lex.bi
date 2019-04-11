@@ -40,6 +40,9 @@ enum LEXCHECK
 	
 	'' don't interpret f, u, l as type-specifier suffixes on numeric literals (used in asm blocks)
 	LEXCHECK_NOLETTERSUFFIX	= &h0400
+
+	'' allow suffix, like when reading potential directives from comments, even though the dialect prohibits suffixes
+	LEXCHECK_ALLOWSUFFIX = &h0800
 	
 end enum
 
@@ -214,9 +217,7 @@ declare function lexGetLookAheadChar _
 		byval skipwhitespc as integer = FALSE _
 	) as uinteger
 
-declare function lexEatChar _
-	( _
-	) as uinteger
+declare sub lexEatChar( )
 
 declare function lexPeekCurrentLine _
 	( _

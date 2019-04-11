@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -201,7 +201,7 @@ namespace fb.fbdoc
 		) as integer
 
 		if( ctx = NULL ) then
-			function = 0
+			function = FALSE
 		else
 			function = ctx->emitted
 		end if
@@ -229,7 +229,7 @@ namespace fb.fbdoc
 		) as integer
 
 		if( ctx = NULL ) then
-			function = 0
+			function = FALSE
 		else
 			function = ctx->scanned
 		end if

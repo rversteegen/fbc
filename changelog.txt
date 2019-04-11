@@ -1,10 +1,41 @@
+Version 1.07.0
+
+[changed]
+
+[added]
+- CVA_LIST type, CVA_START(), CVA_COPY() CVA_END(), CVA_ARG() macros will map to gcc's __builtin_va_list and __builtin_va_* macros in gcc backend
+- Implemented objinfo for Darwin/OSX Mach-O .o files, so #inclib etc. work
+
+[fixed]
+- #881: C backend: support for varadic function parameters in gcc using __builtin_va_list type and related macros
+- push/pop correct GL_PROJECTION matrix and GL_MODELVIEW matrix when setting up graphics screen (gothon)
+- fix char & wchar concatentation.  For char double byte characters (such as Chinese characters), the "wstr = char & wchar" would become "wstr = char & chrw(0) & wchar" (SkyFish)
+
+
 Version 1.06.0
 
 [changed]
+- Name mangling of Integer/Long parameters was reversed on 32bit to match 64bit, so the same FB and C++ code will be compatible on both 32bit and 64bit. Integer is mangled as C++ long (except on Win64), Long is mangled as C++ int.
 - Adjusted warning text for "mixed bool/nonbool operands" warning
+- test-suite uses libfbcunit for unit testing framework
+- SELECT CASE AS CONST respects data type and will show overflow warnings on out-of-range constants
+- boolean: don't allow NEG unary op '-' on boolean data types
+- All fb RTL functions are checked for CONSTness, CONST qualifiers added to fb rtlib built-in prototypes (sf.net #727)
+- WSTRING can be a return type, but only for prototypes (DECLARE) and function pointers, this allows getting PROCPTR() of all fb built-in run time functions
+- multiline comments are parsed in -lang fblite|qb|deprecated as in -lang fb for consistency
 
 [added]
-- Implemented objinfo for Darwin/OSX Mach-O .o files, so #inclib etc. work
+- Name mangling of Long parameters on Win64 are mangled to C++ int by default and to C++ long with a modifier in the form 'as [u]long alias "long"'.  The data type size is still 32bit but allows calling external C++ library expecting a C++ long.
+- -noobjinfo option to disable the writing/reading of compile-time library and other linking options from/to .o and .a files. This also disables the use of fbextra.x (the supplemental linker script) for discarding the .fbctinf sections, which is useful when using the gold linker that doesn't support this kind of linker script.
+- Linux console Inkey() now recognizes F11 and F12
+- 2D render through OpenGL on Windows and Linux via screencontrol (angros47)
+- Windows API binding updated to additionally support _WIN32_WINNT &h0501, &h0600, &h0601
+- Under X11, ScreenControl GET_WINDOW_HANDLE places the Display ptr in param2
+- Updated bindings: SDL2 2.0.6, SDL2_image 2.0.1, SDL2_mixer 2.0.1, SDL2_net 2.0.1, SDL2_ttf 2.0.14
+- allow overload operator SQR()
+- allow [static] shared byref variables to be initialized with byref variable
+- warning '-w constness' to enable 'CONST qualifier discarded' warning on command line
+- #pragma constness to enable/disable 'CONST qualifier discarded' warning in source code
 
 [fixed]
 - win/d3dx9.bi no longer has a hard-coded #inclib "d3dx9d". d3dx9d.dll is apparently not a generally valid choice. In practice programs have to be linked against d3dx9_33.dll or d3dx9_39.dll, etc.
@@ -20,6 +51,53 @@ Version 1.06.0
 - #659: Keep the stack 16-byte aligned on linux-x86 and darwin-x86 to comply with ABI; fixes crashes when external libraries use SSE
 - On Windows, FB console input treated multiple repeated keypresses that were merged into one event by the system as a single keypress
 - Accesses to 64bit bitfields could be miscompiled or trigger a compiler crash
+- #732: Virtual destructors couldn't be called on const objects
+- #790: Windows API and X11 bindings: Fixed some macros where macro parameters conflicted with other identifiers or FB keywords used in the macro body
+- boolean initializer values for global or static variables were not emitted properly
+- Compiler crash after reporting error about REDIM on a fixed-size array field
+- #827: Using the GNU gold linker (instead of ld.bfd) resulted in broken binaries due to fbextra.x, which fbc uses with ld.bfd to discard the objinfo .fbctinf sections, but is not supported by gold. Now when gold is detected, fbextra.x won't be used anymore, in order to get working binaries.
+- exec() on Linux & co was broken with regards to spaces in the executable path. Spaces were converted to "\ " and then to "/ ", resulting in a different path than given.
+- ASM backend: Fixed a compiler crash or potentially bad code generation in complex floating point expressions (which had enough operands to use up the x86 FPU stack, and trigger spilling of st() registers to stack)
+- C backend: Pointer arithmetic on the address of variables with any pointer type gave wrong results due to bad code generation in -gen gcc for this case.
+- LLVM backend: Self-BOP emitting, byref var/param accesses
+- #837: Compiler hang (or assertion triggered, if enabled) for Select Case As Const with Case -1
+- ASM backend: Invalid code generated for Select Case As Const jump table index when 64bit fbc cross-compiles to 32bit
+- #836: The MyUdt() syntax for creating temporary objects allowed creating objects of Abstract types (with unimplemented Abstract methods)
+- WString conversions from UTF32 to UTF16 produced incorrect high surrogate values (affected conversion from UTF32 to Windows WString, and from Linux WString to UTF16)
+- Conversion from UTF32 to Windows WString behaved differently from other UTF32 to UTF16 conversions in FB with regards to truncating surrogate pairs when the destination buffer is full
+- #839: Wstring constants could be allocated with the wrong size when cross-compiling, leading to compiler errors and/or incorrect code generation
+- WCHR would produce garbage if evaluated with constant values above &h3ffff (any value up to &hffffffffU is allowed)
+- WCHR would give the wrong result if given large number of arguments which were large constants
+- #846: Fix compiler crash on global variable initializer with type<T>(...) expression where T isn't a UDT
+- #847: Windows API binding: Fixed winnt.bi SECURITY_*_AUTHORITY initializers
+- #851: '#LINE line filename' only changed the source filename in error messages, not in debug info
+- #857: PAINT used in a VIEWport and without delimitation border induces segmentation violation when ending code
+- #832: Fix bug allowing QB style suffixes on all keywords, regardless of -lang
+- #841: The unary negation operator gave different result signedness when used on constant instead of non-constant expression. Now the result is always signed.
+- Incorrect C++ mangling for BYREF parameters using built-in types
+- #844: Fix bug in -gen gcc due to duplicated type (struct) names in the main module and global namespace
+- #875: Fix bug where boolean variable to single/double conversion gives wrong sign on -gen gas -fpu x87 & sse
+- #872: Fix broken boolean bitfield runtime assignments from unsigned values 
+- #876: ThreadCall does not support subroutine with [U]Long type parameter
+- #877: fix SLEEP behaviour in linux console and wait for key presses, and do not affect input buffer.  Match linux SLEEP to behaviour on Windows.
+- Fixed inline asm procedure name mangling bug (missing underscore prefix) with -gen gcc -asm intel on dos/win32
+- #878: Fix fbc-64bit hangs on 'Case True' + 'Case False' inside 'Select Case As const'
+- Fix SELECT CASE AS CONST to allow both signed & unsigned case range values
+- #822, #814, #842: Compiler crash when initializing static/shared reference (DIM SHARED/STATIC BYREF) with non-constant initializer (e.g. another reference, or dynamic array element)
+- ASM backend: Fix bad code generated for comparisons such as IF @globalvar = 0 THEN
+- #884: FORMATing dates can deadlock under Unix
+- #890: Fix Bad @N stdcall suffix for non-trivial byval type parameters with -gen gcc
+- #642, #886: CASTs involving CONST qualifiers solved out too early allowing invalid statements to be compiled
+- #801: *@(expr) solved to (expr) did not cleanly remove null ptr checks allowing invalid datatype assignment with -exx.  *PTRCHK(@expr) solves to (expr).
+- #880: Overload binary operators now support covariant arguments, overloaded procedure resolution changed especially with respect to CONST and non-CONST parameters
+- Fix for debugging lines in include files but not in procedures.  Filename debugging information added for module level statements in included files.
+- #699: fix new[0] causing infinite loop when calling constructor/destructor list
+- #883: when mapping 32 & 64 bit functions for PALETTE [GET] USING, check the data type pointed to and choose one of LONG PTR, LONGINT PTR, INTEGER PTR
+- #866: fbc was throwing lexer errors in comments stating with $.  Comments are lexed for directives; allow suffixes in comments
+- #858: C backend: fix internal structure size mismatch due to wrong padding when nesting packed structures
+- C backend: fix array descriptor mangling to avoid naming conflicts where array data types differ only by const
+- #823: Function overload resolution for [const] array() and passing non-const array argument to const array parameter
+- Github #113: When a WINDOW was active, the top/right edges (bottom/right for WINDOW SCREEN) were transformed out of the viewport.
 
 
 Version 1.05.0

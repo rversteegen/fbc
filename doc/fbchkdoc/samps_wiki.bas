@@ -1,5 +1,5 @@
 ''  fbchkdoc - FreeBASIC Wiki Management Tools
-''	Copyright (C) 2008 Jeffery R. Marshall (coder[at]execulink[dot]com)
+''	Copyright (C) 2008-2107 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -95,7 +95,7 @@ function WikiExampleCtx.FindNext() as integer
 		select case as const token->id
 		case WIKI_TOKEN_CODE
 
-			'' if( bInExamples = TRUE ) then
+			'' if( bInExamples ) then
 				codeid += 1
 			'' end if
 			

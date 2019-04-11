@@ -11,7 +11,7 @@ Specifies that a function result is returned by reference
 	
 	Functions with ##**Byref**## result should not return local variables from the function, because they will be destroyed upon returning from the function, invalidating any pointer or reference to them. To help with writing safe code, the compiler will show an error message when a local variable is used with ##Function = //x//## (or ##//name// = //x//##) assignments and ##Return //x//## statements.
 	
-	**Note:** On the left-hand side of an assignment expression using the '##=##' symbol, the result of the function (returned by reference) must be enclosed in parentheses when the function calls one single argument, in order to solve the parsing ambiguity. From fbc version 0.90, '##=>##' can be used for assignments, in place of '##=##', same as for initializers, allowing to avoid parsing ambiguity (without parentheses). As for the arguments list, it should always be surrounded with parentheses even if empty.
+	**Note:** On the left-hand side of an assignment expression using the '##=##' symbol, the result of the function (returned by reference) must be enclosed in parentheses when the function calls one single argument, in order to solve the parsing ambiguity. '##=>##' can be used for assignments, in place of '##=##', same as for initializers, allowing to avoid parsing ambiguity (without parentheses). As for the arguments list, it should always be surrounded with parentheses even if empty.
 	
 	Operators (member or global), when used as functions, have also the capability to return results by reference, by using the same syntax.
 
@@ -20,9 +20,9 @@ Specifies that a function result is returned by reference
 Function min( Byref I As Integer , Byref J As Integer ) Byref As Integer
 	'' The smallest integer will be returned by reference, no copy will be created.
 	If I < J Then
-	    Return I
+		Return I
 	Else
-	    Return J
+		Return J
 	End If
 End Function
 
@@ -49,18 +49,22 @@ Function f1( ) ByRef As String
 End Function
 
 Function f2( ByRef _s As String ) ByRef As String
-   '' This variable-length string will be returned by reference, no copy will be created.
+   '' This variable-length string will transit by reference (input and output), no copy will be created.
    Function = _s
 End Function
 
 s = "abcd"
 Print s
 
-f1( ) &= "efgh"
+f1( ) = f1( ) & "efgh"
 Print s
 
-'' At time of writing, the enclosing parentheses are required here.
-( f2( s ) ) &= "ijkl"
+'' The enclosing parentheses are required here on the left-hand side.
+( f2( s ) ) = f2( s ) & "ijkl"
+Print s
+
+'' The enclosing parentheses are not required here on the left-hand side.
+f2( s ) => f2( s ) & "mnop"
 Print s
 %%
 {{fbdoc item="filename" value="examples/manual/procs/byref-result3.bas"}}%%(freebasic)
@@ -81,5 +85,6 @@ Print I
 {{fbdoc item="see"}}
 	- [[ProPgReturnValue|Returning values]]
 	- ##[[KeyPgByref|Byref (parameters)]]##
+	- ##[[KeyPgByrefVariables|Byref (variables)]]##
 
 {{fbdoc item="back" value="CatPgProcedures|Procedures"}}

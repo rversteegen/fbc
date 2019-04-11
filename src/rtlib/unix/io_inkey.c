@@ -40,6 +40,8 @@ static const KEY_DATA key_data[] = {
 	{ "k8", KEY_F8        },
 	{ "k9", KEY_F9        },
 	{ "k;", KEY_F10       },
+	{ "F1", KEY_F11       },
+	{ "F2", KEY_F12       },
 	{ "kh", KEY_HOME      },
 	{ "ku", KEY_UP        },
 	{ "kP", KEY_PAGE_UP   },
@@ -53,7 +55,7 @@ static const KEY_DATA key_data[] = {
 	{ NULL, 0 }
 };
 
-static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0;
+static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0, key_buffer_changed = FALSE;
 static NODE *root_node = NULL;
 
 static void add_key(NODE **node, char *key, short code)
@@ -203,6 +205,7 @@ void fb_hAddCh( int k )
 	if (((key_tail + 1) & (KEY_BUFFER_LEN - 1)) == key_head)
 		key_head = (key_head + 1) & (KEY_BUFFER_LEN - 1);
 	key_tail = (key_tail + 1) & (KEY_BUFFER_LEN - 1);
+	key_buffer_changed = TRUE;
 }
 
 int fb_hGetCh(int remove)
@@ -272,8 +275,13 @@ int fb_ConsoleGetkey( void )
 /* Caller is expected to hold FB_LOCK() */
 int fb_ConsoleKeyHit( void )
 {
+	int result;
+
 	if (!__fb_con.inited)
 		return feof(stdin) ? FALSE : TRUE;
 
-	return (fb_hGetCh(FALSE) < 0) ? 0 : 1;
+	fb_hGetCh(FALSE);
+	result = key_buffer_changed;
+	key_buffer_changed = FALSE;
+	return result;
 }

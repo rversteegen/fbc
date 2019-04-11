@@ -1,59 +1,64 @@
-# include "fbcu.bi"
+# include "fbcunit.bi"
 
-#if __FB_BACKEND__ = "gas"
+#if defined( __FB_64BIT__ ) 
+	#if defined( __FB_WIN32__ )
+		#define DOTEST
+	#endif	
+#elseif (__FB_BACKEND__ = "gas")
+	#define DOTEST
+#endif
 
-namespace fbc_tests.functions.va_int_and_ptrs
+'' for other targets, see va_int_and_ptrs-gcc.bas
 
-sub varints cdecl ( byval n as integer, ... )
-	dim va as any ptr
-	dim i as integer
+#ifdef DOTEST
 
-	va = va_first( )
+SUITE( fbc_tests.functions.va_int_and_ptrs )
 
-	for i = 1 to n
-		CU_ASSERT( va_arg( va, integer ) = i )
-		va = va_next( va, integer )
-	next
-end sub
+	sub varints cdecl ( byval n as integer, ... )
+		dim va as any ptr
+		dim i as integer
 
-sub varintptrs cdecl ( byval n as integer, ... )
-	dim va as any ptr
-	dim i as integer
+		va = va_first( )
 
-	va = va_first( )
+		for i = 1 to n
+			CU_ASSERT( va_arg( va, integer ) = i )
+			va = va_next( va, integer )
+		next
+	end sub
 
-	for i = 1 to n
-		CU_ASSERT( *va_arg( va, integer ptr ) )
-		va = va_next( va, integer ptr )
-	next
-end sub
+	sub varintptrs cdecl ( byval n as integer, ... )
+		dim va as any ptr
+		dim i as integer
 
-sub vaints_test( d as integer )
-	dim as integer a, b, c
-	dim as integer ptr pa, pb, pc
-	dim as integer ptr ptr ppc
-	a = 1
-	b = 2
-	c = 3
+		va = va_first( )
 
-	pa = @a
-	pb = @b
-	pc = @c
-	ppc = @pc
+		for i = 1 to n
+			CU_ASSERT( *va_arg( va, integer ptr ) )
+			va = va_next( va, integer ptr )
+		next
+	end sub
 
-	varints 4, a, *pb, **ppc, d
-	varintptrs 4, pa, pb, pc, @d
-end sub
+	sub vaints_test( d as integer )
+		dim as integer a, b, c
+		dim as integer ptr pa, pb, pc
+		dim as integer ptr ptr ppc
+		a = 1
+		b = 2
+		c = 3
 
-sub test_1 cdecl ()
-	vaints_test 4
-end sub
+		pa = @a
+		pb = @b
+		pc = @c
+		ppc = @pc
 
-sub ctor () constructor
-	fbcu.add_suite("fbc_tests.functions.va_int_and_ptrs")
-	fbcu.add_test("test_1", @test_1)
-end sub
+		varints 4, a, *pb, **ppc, d
+		varintptrs 4, pa, pb, pc, @d
+	end sub
 
-end namespace
+	TEST( varIntegerArgs )
+		vaints_test 4
+	END_TEST
+
+END_SUITE
 
 #endif

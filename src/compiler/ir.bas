@@ -216,7 +216,7 @@ sub irhlFlushStaticInitializer( byval sym as FBSYMBOL ptr )
 end sub
 
 #if __FB_DEBUG__
-function vregDump( byval v as IRVREG ptr ) as string
+function vregDumpToStr( byval v as IRVREG ptr ) as string
 	dim as string s
 	dim as string regname
 
@@ -265,7 +265,12 @@ function vregDump( byval v as IRVREG ptr ) as string
 	if( v->typ <> IR_VREGTYPE_REG ) then
 		if( v->ofs ) then
 			if( (env.clopt.backend = FB_BACKEND_GAS) and (v->sym <> NULL) ) then
-				s += " [" + *symbGetMangledName( v->sym ) + "+" + str( v->ofs ) + "]"
+				s += " [" + *symbGetMangledName( v->sym )
+				if( v->ofs >= 0 ) then
+					s += "+"
+				end if
+				s += str( v->ofs )
+				s += "]"
 			else
 				s += " ofs=" + str( v->ofs )
 			end if
@@ -275,11 +280,11 @@ function vregDump( byval v as IRVREG ptr ) as string
 		end if
 	end if
 
-	s += " " + typeDump( v->dtype, v->subtype )
+	s += " " + typeDumpToStr( v->dtype, v->subtype )
 
 	if( v->typ <> IR_VREGTYPE_REG ) then
 		if( v->vidx ) then
-			s += " vidx=<" + vregDump( v->vidx ) + ">"
+			s += " vidx=<" + vregDumpToStr( v->vidx ) + ">"
 		end if
 	end if
 
@@ -288,9 +293,14 @@ function vregDump( byval v as IRVREG ptr ) as string
 	'' C/LLVM backends: don't use vaux, so only show it if it's set
 	if( ISLONGINT( v->dtype ) and _
 	    ((env.clopt.backend = FB_BACKEND_GAS) or (v->vaux <> NULL)) ) then
-		s += " vaux=<" + vregDump( v->vaux ) + ">"
+		s += " vaux=<" + vregDumpToStr( v->vaux ) + ">"
 	end if
 
 	function = s
 end function
+
+sub vregDump( byval v as IRVREG ptr )
+	print vregDumpToStr( v )
+end sub
+
 #endif

@@ -1,5 +1,5 @@
 ''  fbhelp - FreeBASIC help viewer
-''  Copyright (C) 2006-2008 Jeffery R. Marshall (coder[at]execulink.com)
+''  Copyright (C) 2006-2018 Jeffery R. Marshall (coder[at]execulink.com)
 
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -257,7 +257,7 @@ public sub Screen_HideCursor ( )
 	dim curs as CONSOLE_CURSOR_INFO
 
 	GetConsoleCursorInfo( hStdOut, @curs )
-	if( curs.bVisible = TRUE ) then
+	if( curs.bVisible ) then
 		curs.bVisible = FALSE
 		SetConsoleCursorInfo( hStdOut, @curs )
 	end if
@@ -340,7 +340,7 @@ end sub
 '':::::
 public sub Screen_Restore ( byval bRelease as integer )
 	
-	if( screen_saved = TRUE ) then
+	if( screen_saved ) then
 
 		if( screen_data <> NULL ) then
 

@@ -24,6 +24,8 @@ declare sub	parserEnd ( )
 declare sub	parserSetCtx ( )
 
 '' globals
+dim shared env as FBENV
+
 	dim shared infileTb( ) as FBFILE
 
 	dim shared as FB_LANG_INFO langTb(0 to FB_LANGS-1) = _
@@ -111,6 +113,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		FB_FUNCMODE_STDCALL, _  '' stdcall
 		0	or FB_TARGETOPT_EXPORT _
 			or FB_TARGETOPT_RETURNINREGS _
+			or FB_TARGETOPT_COFF _
 	), _
 	( _
 		@"cygwin", _
@@ -120,6 +123,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0	or FB_TARGETOPT_UNIX _
 			or FB_TARGETOPT_EXPORT _
 			or FB_TARGETOPT_RETURNINREGS _
+			or FB_TARGETOPT_COFF _
 	), _
 	( _
 		@"linux", _
@@ -129,6 +133,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0	or FB_TARGETOPT_UNIX _
 			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 			or FB_TARGETOPT_STACKALIGN16 _
+			or FB_TARGETOPT_ELF _
 	), _
 	( _
 		@"dos", _
@@ -136,6 +141,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		FB_FUNCMODE_CDECL, _
 		FB_FUNCMODE_STDCALL_MS, _
 		0	or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
+			or FB_TARGETOPT_COFF _
 	), _
 	( _
 		@"xbox", _
@@ -143,6 +149,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		FB_FUNCMODE_STDCALL, _
 		FB_FUNCMODE_STDCALL, _
 		0	or FB_TARGETOPT_RETURNINREGS _
+			or FB_TARGETOPT_COFF _
 	), _
 	( _
 		@"freebsd", _
@@ -152,6 +159,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0	or FB_TARGETOPT_UNIX _
 			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 			or FB_TARGETOPT_RETURNINREGS _
+			or FB_TARGETOPT_ELF _
 	), _
 	( _
 		@"openbsd", _
@@ -161,6 +169,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0	or FB_TARGETOPT_UNIX _
 			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 			or FB_TARGETOPT_RETURNINREGS _
+			or FB_TARGETOPT_ELF _
 	), _
 	( _
 		@"darwin", _
@@ -171,6 +180,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 			or FB_TARGETOPT_RETURNINREGS _
 			or FB_TARGETOPT_STACKALIGN16 _
+			or FB_TARGETOPT_MACHO _
 	), _
 	( _
 		@"netbsd", _
@@ -180,6 +190,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0	or FB_TARGETOPT_UNIX _
 			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 			or FB_TARGETOPT_RETURNINREGS _
+			or FB_TARGETOPT_ELF _
 	) _
 }
 
@@ -247,10 +258,13 @@ private function hFindIncFile _
 
 end function
 
-'':::::
+'' Add a string to filenamehash if missing, and add a copy of the filenamehash
+'' entry to incfilehash if missing, unless incfilehash is NULL.
+'' Invariant: incfilehash is a subset of filenamehash.
 private function hAddIncFile _
 	( _
 		byval incfilehash as THASH ptr, _
+		byval filenamehash as THASH ptr, _
 		byval filename as zstring ptr _
 	) as zstring ptr static
 
@@ -266,16 +280,22 @@ private function hAddIncFile _
 
 	index = hashHash( fname )
 
-	res = hashLookupEx( incfilehash, fname, index )
+	res = hashLookupEx( filenamehash, fname, index )
 	if( res = NULL ) then
-		hashAdd( incfilehash, fname, fname, index )
+		hashAdd( filenamehash, fname, fname, index )
 	else
 		deallocate( fname )
 		fname = res
 	end if
 
-	function = fname
+	if( incfilehash ) then
+		res = hashLookupEx( incfilehash, fname, index )
+		if( res = NULL ) then
+			hashAdd( incfilehash, fname, fname, index )
+		end if
+	end if
 
+	function = fname
 end function
 
 '':::::
@@ -381,8 +401,9 @@ sub fbInit( byval ismain as integer, byval restarts as integer, byval entry as z
 	'' After symbInit(), we can use typeGetSize()
 	env.wchar_doconv = (sizeof( wstring ) = typeGetSize( env.target.wchar ))
 
-	hashInit( @env.incfilehash, FB_INITINCFILES )
-	hashInit( @env.inconcehash, FB_INITINCFILES )
+	hashInit( @env.filenamehash, FB_INITINCFILES )
+	hashInit( @env.incfilehash, FB_INITINCFILES, FALSE )
+	hashInit( @env.inconcehash, FB_INITINCFILES, FALSE )
 
 	stackNew( @parser.stmt.stk, FB_INITSTMTSTACKNODES, len( FB_CMPSTMTSTK ), FALSE )
 	lexInit( FALSE )
@@ -396,6 +417,7 @@ sub fbEnd()
 	lexEnd( )
 	stackFree( @parser.stmt.stk )
 
+	hashEnd( @env.filenamehash )
 	hashEnd( @env.inconcehash )
 	hashEnd( @env.incfilehash )
 
@@ -438,13 +460,14 @@ sub fbGlobalInit()
 	env.clopt.lang          = FB_DEFAULT_LANG
 	env.clopt.forcelang     = FALSE
 
-	env.clopt.debug         = FALSE
+	env.clopt.debuginfo     = FALSE
+	env.clopt.assertions    = FALSE
 	env.clopt.errorcheck    = FALSE
 	env.clopt.extraerrchk   = FALSE
 	env.clopt.resumeerr     = FALSE
 	env.clopt.profile       = FALSE
 
-	env.clopt.warninglevel  = 0
+	env.clopt.warninglevel  = FB_WARNINGMSGS_DEFAULT_LEVEL
 	env.clopt.showerror     = TRUE
 	env.clopt.maxerrors     = FB_DEFAULT_MAXERRORS
 	env.clopt.pdcheckopt    = FB_PDCHECK_NONE
@@ -456,6 +479,9 @@ sub fbGlobalInit()
 	env.clopt.pic           = FALSE
 	env.clopt.msbitfields   = FALSE
 	env.clopt.stacksize     = FB_DEFSTACKSIZE
+	env.clopt.objinfo       = TRUE
+	env.clopt.showincludes  = FALSE
+	env.clopt.modeview      = FB_DEFAULT_MODEVIEW
 
 	hUpdateLangOptions( )
 	hUpdateTargetOptions( )
@@ -504,8 +530,10 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 	case FB_COMPOPT_FORCELANG
 		env.clopt.forcelang = value
 
-	case FB_COMPOPT_DEBUG
-		env.clopt.debug = value
+	case FB_COMPOPT_DEBUGINFO
+		env.clopt.debuginfo = value
+	case FB_COMPOPT_ASSERTIONS
+		env.clopt.assertions = value
 	case FB_COMPOPT_ERRORCHECK
 		env.clopt.errorcheck = value
 	case FB_COMPOPT_RESUMEERROR
@@ -526,6 +554,8 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 
 	case FB_COMPOPT_GOSUBSETJMP
 		env.clopt.gosubsetjmp = value
+	case FB_COMPOPT_VALISTASPTR
+		env.clopt.valistasptr = value
 	case FB_COMPOPT_EXPORT
 		env.clopt.export = value
 	case FB_COMPOPT_MSBITFIELDS
@@ -541,8 +571,12 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 		if (env.clopt.stacksize < FB_MINSTACKSIZE) then
 			env.clopt.stacksize = FB_MINSTACKSIZE
 		end if
+	case FB_COMPOPT_OBJINFO
+		env.clopt.objinfo = value
 	case FB_COMPOPT_SHOWINCLUDES
 		env.clopt.showincludes = value
+	case FB_COMPOPT_MODEVIEW
+		env.clopt.modeview = value
 	end select
 end sub
 
@@ -575,8 +609,10 @@ function fbGetOption( byval opt as integer ) as integer
 	case FB_COMPOPT_FORCELANG
 		function = env.clopt.forcelang
 
-	case FB_COMPOPT_DEBUG
-		function = env.clopt.debug
+	case FB_COMPOPT_DEBUGINFO
+		function = env.clopt.debuginfo
+	case FB_COMPOPT_ASSERTIONS
+		function = env.clopt.assertions
 	case FB_COMPOPT_ERRORCHECK
 		function = env.clopt.errorcheck
 	case FB_COMPOPT_RESUMEERROR
@@ -597,6 +633,8 @@ function fbGetOption( byval opt as integer ) as integer
 
 	case FB_COMPOPT_GOSUBSETJMP
 		function = env.clopt.gosubsetjmp
+	case FB_COMPOPT_VALISTASPTR
+		function = env.clopt.valistasptr
 	case FB_COMPOPT_EXPORT
 		function = env.clopt.export
 	case FB_COMPOPT_MSBITFIELDS
@@ -609,8 +647,12 @@ function fbGetOption( byval opt as integer ) as integer
 		function = env.clopt.pic
 	case FB_COMPOPT_STACKSIZE
 		function = env.clopt.stacksize
+	case FB_COMPOPT_OBJINFO
+		function = env.clopt.objinfo
 	case FB_COMPOPT_SHOWINCLUDES
 		function = env.clopt.showincludes
+	case FB_COMPOPT_MODEVIEW
+		function = env.clopt.modeview
 
 	case else
 		function = 0
@@ -834,6 +876,19 @@ function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 	end select
 end function
 
+function fbTargetSupportsELF( ) as integer
+	return ((env.target.options and FB_TARGETOPT_ELF) <> 0)
+end function
+
+function fbTargetSupportsMACHO( ) as integer
+	return ((env.target.options and FB_TARGETOPT_MACHO) <> 0)
+end function
+
+function fbTargetSupportsCOFF( ) as integer
+	return ((env.target.options and FB_TARGETOPT_COFF) <> 0)
+end function
+
+
 '':::::
 function fbGetEntryPoint( ) as string static
 
@@ -1005,7 +1060,7 @@ sub fbCompile _
 
 	env.inf.name = *infname
 	hReplaceSlash( env.inf.name, asc( FB_HOST_PATHDIV ) )
-	env.inf.incfile	= NULL
+	env.inf.incfile = hAddIncFile( NULL, @env.filenamehash, env.inf.name )
 	env.inf.ismain = ismain
 
 	env.outf.name = *outfname
@@ -1056,13 +1111,12 @@ sub fbCompile _
 
 	fbMainEnd( )
 
-	'' not cross-compiling?
-	if( fbIsCrossComp( ) = FALSE ) then
-		'' compiling only?
-		if( env.clopt.outtype = FB_OUTTYPE_OBJECT ) then
-			'' store libs, paths and cmd-line options in the obj
-			hEmitObjinfo( )
-		end if
+	'' compiling only, not cross-compiling?
+	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
+	    (not fbIsCrossComp( )) and _
+	    (env.clopt.outtype = FB_OUTTYPE_OBJECT) ) then
+		'' store libs, paths and cmd-line options in the obj
+		hEmitObjinfo( )
 	end if
 
 	'' save
@@ -1101,7 +1155,7 @@ end sub
 sub fbPragmaOnce()
 	if( env.inf.name > "" ) then
 		if( hFindIncFile( @env.inconcehash, env.inf.name ) = NULL ) then
-			hAddIncFile( @env.inconcehash, env.inf.name )
+			hAddIncFile( @env.inconcehash, @env.filenamehash, env.inf.name )
 		end if
 	end if
 end sub
@@ -1339,7 +1393,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	end if
 
     '' we should respect the path here too
-	fileidx = hAddIncFile( @env.incfilehash, incfile )
+	fileidx = hAddIncFile( @env.incfilehash, @env.filenamehash, incfile )
 
 	'' push context
 	infileTb(env.includerec) = env.inf
@@ -1378,6 +1432,14 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	env.inf = infileTb( env.includerec )
 end sub
 
+'' Used by #line to change the effective filename of the current source file.
+sub fbOverrideFilename(byval filename as zstring ptr)
+	env.inf.name = *filename
+	'' env.inf.incfile is an interned copy of env.inf.name (possibly up-cased),
+	'' so must be updated too.
+	env.inf.incfile = hAddIncFile( NULL, @env.filenamehash, filename )
+end sub
+
 '':::::
 function fbGetLangId _
 	( _
@@ -1396,5 +1458,69 @@ function fbGetLangId _
 	case else
 		function = FB_LANG_INVALID
 	end select
+
+end function
+
+'':::::
+function fbGetBackendValistType _	
+	( _
+	) as FB_CVA_LIST_TYPEDEF
+
+	dim typedef as FB_CVA_LIST_TYPEDEF = FB_CVA_LIST_NONE
+
+	select case env.clopt.backend
+	case FB_BACKEND_GCC
+
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		case FB_CPUFAMILY_X86_64
+			select case env.clopt.target
+			case FB_COMPTARGET_WIN32
+				typedef = FB_CVA_LIST_BUILTIN_POINTER
+			case else
+				typedef = FB_CVA_LIST_BUILTIN_C_STD
+			end select
+
+		case FB_CPUFAMILY_ARM
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		case FB_CPUFAMILY_AARCH64
+			typedef = FB_CVA_LIST_BUILTIN_AARCH64
+
+		case else
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		end select
+
+	case FB_BACKEND_GAS
+		typedef = FB_CVA_LIST_POINTER
+
+	case FB_BACKEND_LLVM
+		'' ???
+		typedef = FB_CVA_LIST_POINTER
+
+	case else
+		typedef = FB_CVA_LIST_POINTER
+
+	end select
+
+	assert( typedef <> FB_CVA_LIST_NONE )
+
+	'' on gcc backend we prefer that the cva_list type
+	'' map to gcc's __builtin_va_list, which is a different
+	'' type depending on platform. If the combination of
+	'' target and arch support it, we can override this with 
+	'' -z valist-as-ptr to force use of pointer expressions
+	'' instead of builtins even though gcc is backend.
+
+	if( typedef = FB_CVA_LIST_BUILTIN_POINTER ) then
+		if( fbGetOption( FB_COMPOPT_VALISTASPTR ) ) then
+			typedef = FB_CVA_LIST_POINTER
+		endif
+	end if
+
+	function = typedef
 
 end function

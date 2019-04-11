@@ -15,10 +15,9 @@ Divides a value and assigns the remainder to a variable
 
 {{fbdoc item="desc"}}
 	This operator divides two values of ##[[KeyPgInteger|Integer]]## type and assigns the remainder to its left-hand side (##//lhs//##) variable. It is functionally equivalent to:
-##
-		//lhs// = //lhs// [[KeyPgOpModulus|Mod]] //rhs//
-##
-	This operator can be overloaded for user-defined types.
+		##//lhs// = //lhs// [[KeyPgOpModulus|Mod]] //rhs//##
+		
+	This operator can be overloaded for user-defined types as a member ##[[KeyPgOperator|Operator]]## using the appropriate syntax.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/operator/mod-assign.bas"}}%%(freebasic)
@@ -37,7 +36,7 @@ SLEEP
 	- New to ""FreeBASIC""
 
 {{fbdoc item="see"}}
-	- ##[[KeyPgOpModulus|Operator + (Modulus)]]##
+	- ##[[KeyPgOpModulus|Operator Mod (Modulus)]]##
 	- [[CatPgMath|Mathematical Functions]]
 
 {{fbdoc item="back" value="CatPgOpAssignment|Assignment Operators"}}{{fbdoc item="back" value="CatPgOperators|Operators"}}

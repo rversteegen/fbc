@@ -7,83 +7,146 @@ Declare virtual methods
 	End [[KeyPgType|Type]]
 ##
 {{fbdoc item="desc"}}
-	**Virtual** methods are methods that can be overridden by data types derived from the type they were declared in, allowing for polymorphism. In contrast to ##[[KeyPgAbstract|Abstract]]## methods, virtual methods must have an implementation, which is used when the virtual is not overridden.
+	**Virtual** methods are methods that can be overridden by data types derived from the type they were declared in, allowing for dynamic polymorphism. In contrast to ##[[KeyPgAbstract|Abstract]]## methods, virtual methods must have an implementation, which is used when the virtual is not overridden.
 	
-	A derived type can override virtual methods declared in its base type by declaring a method with the same identifier and signature, meaning same number and type of parameters, same return type (if any) and same calling convention:
+	A derived type can override virtual methods declared in its base type by declaring a non-static method with the same identifier and signature, meaning same number and type of parameters (invariant parameters), same calling convention, and if any, same return type (or a covariant return type for return by reference or by pointer):
 		- if that differs only in parameter passing mode or calling convention or return type, then an overriding error is returned at compile time,
-		- otherwise shadowing only is permitted for any other signature difference, corresponding to case where both methods would be overloadable.
-	The property of being a virtual method is not implicitly inherited by the overriding method in the derived type.
+		- otherwise, only shadowing is allowed for any other signature difference, corresponding to case where both methods would be overloadable (if within the same type).
+	The property of being a virtual method is not implicitly inherited by the overriding method in the derived type. If this overriding method must be overridden in turn in a lower level derived type, it must also be declared as virtual.
+	On the other hand, since a derived static method can never override a base virtual/abstract method, it can therefore shadow any base method (including virtual/abstract) with same identifier and regardless of the signature.
 	
 	When calling virtual methods, the compiler may need to do a vtable lookup in order to find out which method must be called for a given object. This requires an extra hidden vtable pointer field to be added at the top of each type with virtual methods. This hidden vptr is provided by the built-in ##[[KeyPgObject|Object]]## type. Because of that, virtual methods can only be declared in a type that directly or indirectly ##[[KeyPgExtends|extends]]## ##[[KeyPgObject|Object]]##.
 	
+	Dynamic polymorphism by using override procedures:
+		- Normally only a ##//typename//## procedure (or upper in hierarchy) is accessible through a base-##//typename//## reference/pointer even if this one refers to an object derived from ##//typename//##.
+		- But when the procedure is virtual, this tells the running program to resolve the override procedure the most derived relating to the real object type by vtable lookup (dynamic binding at runtime), rather than procedure normally accessible from the raw base-type of the reference/pointer (static binding at compile time).
+	
 	[[KeyPgConstructor|Constructors]] cannot be virtual because they create objects, while virtual methods require an already-existing object with a specific type.  The type of the constructor to call is determined at compile-time from the code.
 	In addition, when calling a virtual method inside a constructor, only the version of the method corresponding to an object of type of this constructor is used. That is because the vptr has not yet been set up by the derived type constructor, but only by the local type constructor.
-
+	
 	[[KeyPgDestructor|Destructors]] often must be virtual when deleting an object manipulated through a pointer to its base type, so that the destruction starts at the most derived type and works its way down to the base type. To do this, it may be necessary to add virtual destructors with an empty body anywhere an explicit destruction was not yet required, in order to supersede each non-virtual implicit destructor induced by the destructor in its base.
 	On the other hand, when calling a virtual (or abstract) method inside a destructor (virtual or not), only the version of the method corresponding to an object of type of this destructor is used because the vptr is reset at the top of the destructor according to its own type's vtable. This avoids to access child methods and so to refer to child members previously destroyed by the child destructor execution.
-
+	
 	For member methods with ##**Virtual**## in their declaration, ##**Virtual**## can also be specified on the corresponding method bodies, for improved code readability.
-
+	
 	**Note:** In a multi-level inheritance, a same named method (same identifier and signature) can be declared ##[[KeyPgAbstract|Abstract]]##, ##**Virtual**## or normal (without specifier) at each inheritance hierarchy level. When there is mixing of  specifiers, the usual order is abstract -> virtual -> normal, from top to bottom of the inheritance hierarchy.
 	The access control (##[[KeyPgVisPublic|Public]]##/##[[KeyPgVisProtected|Protected]]##/##[[KeyPgVisPrivate|Private]]##) of an overriding method is not taken into account by the internal polymorphism process, but only for the initial call at compile-time.
 	##[[KeyPgBase|Base]].##method() calls always the base's own method, never the overriding method.
-	A derived static method cannot override a base virtual/abstract method, but can shadow any base method (including virtual/abstract).
-
+	
 {{fbdoc item="ex"}}
-{{fbdoc item="filename" value="examples/manual/udt/virtual1.bas"}}%%(freebasic)
-type Hello extends object
-	declare virtual sub hi( )
-end type
-
-type HelloEnglish extends Hello
-	declare sub hi( )
-end type
-
-type HelloFrench extends Hello
-	declare sub hi( )
-end type
-
-type HelloGerman extends Hello
-	declare sub hi( )
-end type
+{{fbdoc item="filename" value="examples/manual/udt/virtual1.bas"}}
+%%(freebasic)
+'' Example with overriding subroutines
 
 
-sub Hello.hi( )
-	print "hi!"
-end sub
+Type Hello Extends Object
+	Declare Virtual Sub hi( )
+End Type
 
-sub HelloEnglish.hi( )
-	print "hello!"
-end sub
+Type HelloEnglish Extends Hello
+	Declare Sub hi( )            '' overriding subroutine
+End Type
 
-sub HelloFrench.hi( )
-	print "Salut!"
-end sub
+Type HelloFrench Extends Hello
+	Declare Sub hi( )            '' overriding subroutine
+End Type
 
-sub HelloGerman.hi( )
-	print "Hallo!"
-end sub
+Type HelloGerman Extends Hello
+	Declare Sub hi( )            '' overriding subroutine
+End Type
 
 
-	randomize( timer( ) )
+Sub Hello.hi( )
+	Print "hi!"
+End Sub
 
-	dim as Hello ptr h
+Sub HelloEnglish.hi( )           '' overriding subroutine
+	Print "hello!"
+End Sub
 
-	for i as integer = 0 to 9
-		select case( int( rnd( ) * 4 ) + 1 )
-		case 1
-			h = new HelloEnglish
-		case 2
-			h = new HelloFrench
-		case 3
-			h = new HelloGerman
-		case else
-			h = new Hello
-		end select
+Sub HelloFrench.hi( )            '' overriding subroutine
+	Print "Salut!"
+End Sub
 
-		h->hi( )
-		delete h
-	next
+Sub HelloGerman.hi( )            '' overriding subroutine
+	Print "Hallo!"
+End Sub
+
+
+Randomize( Timer( ) )
+
+Dim As Hello Ptr h
+
+For i As Integer = 0 To 9
+	Select Case( Int( Rnd( ) * 4 ) + 1 )
+	Case 1
+		h = New HelloEnglish
+	Case 2
+		h = New HelloFrench
+	Case 3
+		h = New HelloGerman
+	Case Else
+		h = New Hello
+	End Select
+
+	h->hi( )
+	Delete h
+Next
+
+Sleep
+%%
+{{fbdoc item="filename" value="examples/manual/udt/virtual2.bas"}}
+%%(freebasic)
+'' Example with overriding destructor and
+''              overriding function with covariant return
+
+
+Type myBase Extends Object
+  Declare Virtual Function clone () As myBase Ptr
+  Declare Virtual Sub Destroy ()
+End Type
+
+Function myBase.clone () As myBase Ptr
+  Dim As myBase Ptr pp = New myBase(This)
+  Print "myBase.clone() As myBase Ptr", pp
+  Function = pp
+End Function
+
+Sub myBase.Destroy ()
+  Print "myBase.Destroy()", , @This
+  Delete @This
+End Sub
+
+
+Type myDerived Extends myBase
+  Declare Function clone () As myDerived Ptr     '' overriding member function with covariant return
+  Declare Sub Destroy ()                         '' overriding member subroutine
+End Type
+
+Function myDerived.clone () As myDerived Ptr     '' overriding member function with covariant return
+  Dim As myDerived Ptr pc = New myDerived(This)
+  Print "myDerived.clone() As myDerived Ptr", pc
+  Function = pc
+End Function
+
+Sub myDerived.Destroy ()                         '' overriding member subroutine
+  Print "myDerived.Destroy()", , @This
+  Delete @This
+End Sub
+
+
+Dim As myDerived c
+
+Dim As myBase Ptr ppc = @c
+Dim As myDerived Ptr pcc = @c
+
+Dim As myBase Ptr ppc1 = ppc->clone()            '' using base pointers and polymorphism
+Dim As myDerived Ptr pcc1 = pcc->clone()         '' using derived pointers and covariance of return value
+Print
+ppc1->Destroy()                                  '' using base pointer and polymorphism
+pcc1->Destroy()                                  '' using derived pointer
+
+Sleep
 %%
 {{fbdoc item="lang"}}
 	- Only available in the //[[CompilerOptlang|-lang fb]]// dialect.
@@ -96,5 +159,6 @@ end sub
 	- ##[[KeyPgObject|Object]]##
 	- ##[[KeyPgExtends|Extends]]##
 	- ##[[KeyPgAbstract|Abstract]]##
+	- ##[[KeyPgOverride|Override]]##
 
 {{fbdoc item="back" value="CatPgUserDefTypes|User Defined Types"}}

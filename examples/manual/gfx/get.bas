@@ -3,10 +3,10 @@
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
 ''
-'' See Also: http://www.freebasic.net/wiki/wikka.php?wakka=KeyPgGetgraphics
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgGetgraphics
 '' --------
 
-#include once "fbgfx.bi"
+#include Once "fbgfx.bi"
 
 '' Setup a 400x300 32bit screen
 ScreenRes 400, 300, 32
@@ -33,6 +33,8 @@ Put (150,150), image
 Put (150,200), image
 Put (150,250), image
 
+ImageDestroy(image)
+
 '' And a frame around a whole screen..
 Line (0,0)-(400-1,300-1), RGB(255,255,0), b
 
@@ -52,3 +54,5 @@ While ((Inkey() = "") And (x < 350))
 
 	x += 10
 Wend
+
+ImageDestroy(big)

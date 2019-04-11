@@ -72,8 +72,8 @@ end type
 type FB_CMPSTMT_SELCONST
 	base			as integer
 	deflabel 		as FBSYMBOL ptr
-	minval			as ulongint
-	maxval			as ulongint
+	dtype			as integer  '' original data type SELECT CASE AS CONST converts sym to u(long)int
+	bias			as ulongint '' bias (distance to zero)
 end type
 
 type FB_CMPSTMT_SELECT
@@ -794,9 +794,22 @@ declare function cFileFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 declare function cErrorFunct() as ASTNODE ptr
 declare function cIIFFunct() as ASTNODE ptr
 declare function cVAFunct() as ASTNODE ptr
+declare function cVALISTFunct( byval tk as FB_TOKEN ) as ASTNODE ptr
+declare function cVALISTStmt( byval tk as FB_TOKEN ) as integer
 declare function cScreenFunct() as ASTNODE ptr
 declare function cAnonType( ) as ASTNODE ptr
 declare function cConstIntExpr _
+	( _
+		byval expr as ASTNODE ptr, _
+		byval dtype as integer = FB_DATATYPE_INTEGER _
+	) as longint
+declare function hIsConstInRange _
+	( _
+		byval dtype as integer, _
+		byval value as longint, _
+		byval todtype as integer _
+	) as integer
+declare function cConstIntExprRanged _
 	( _
 		byval expr as ASTNODE ptr, _
 		byval dtype as integer = FB_DATATYPE_INTEGER _
@@ -944,7 +957,7 @@ declare function hIntegerTypeFromBitSize _
 
 '':::::
 #macro hEmitCurrLine( )
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		if( env.includerec = 0 ) then
 			astAdd( astNewLIT( lexCurrLineGet( ) ) )
 			lexCurrLineReset( )

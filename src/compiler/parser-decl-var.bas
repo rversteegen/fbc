@@ -778,12 +778,7 @@ private function hVarInitDefault _
 end function
 
 '' Ensure the initializer doesn't reference any vars it mustn't
-private function hCheckGlobalInitializer _
-	( _
-		byval sym as FBSYMBOL ptr, _
-		byval initree as ASTNODE ptr _
-	) as integer
-
+private sub hCheckVarsUsedInGlobalInit( byval sym as FBSYMBOL ptr, byref initree as ASTNODE ptr )
 	'' Allow temp vars and temp array descriptors
 	var ignoreattribs = FB_SYMBATTRIB_TEMP or FB_SYMBATTRIB_DESCRIPTOR
 
@@ -794,11 +789,62 @@ private function hCheckGlobalInitializer _
 
 	if( astTypeIniUsesLocals( initree, ignoreattribs ) ) then
 		errReport( FB_ERRMSG_INVALIDREFERENCETOLOCAL )
-		return FALSE
+		astDelTree( initree )
+		initree = NULL
+	end if
+end sub
+
+''
+'' Check whether global var initiaizer is valid.
+''
+'' In general, STATIC/SHARED var initializers must be constants or OFFSETs
+'' (address of other global symbols), because they're emitted into .data/.bss
+'' sections, and there is no code to be executed to do the initialization.
+''
+'' However, for vars with constructors we have to execute code to do the
+'' initialization, so the initializer may just aswell be more complex (e.g.
+'' function calls as arguments to the constructor call). Temp vars are ok here,
+'' because they will be duplicated to the ctor call scope as needed by the
+'' TYPEINI scope handling. Local non-static vars cannot be allowed, since
+'' they're from a different scope
+''
+'' SHARED var initializers must not reference local STATICs, because those
+'' symbols will be deleted by the time the global is emitted. This can only
+'' happen with STATICs from the implicit main() because those from inside
+'' procedures aren't visible to SHARED declarations at the toplevel. The other
+'' way round (STATIC non-SHARED initializer using a non-STATIC SHARED) is ok
+'' though; it will be "forward referenced" in the .asm output, because STATICs
+'' are emitted before globals, but it works.
+''
+private sub hValidateGlobalVarInit( byval sym as FBSYMBOL ptr, byref initree as ASTNODE ptr )
+	'' Not a global?
+	if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED)) = 0 ) then
+		return
 	end if
 
-	return TRUE
-end function
+	'' Disallow initialization of global dynamic strings
+	'' (not implemented - requires executing code)
+	if( (symbGetType( sym ) = FB_DATATYPE_STRING) and (not symbIsRef( sym )) ) then
+		errReport( FB_ERRMSG_CANTINITDYNAMICSTRINGS, TRUE )
+		astDelTree( initree )
+		initree = NULL
+		return
+	end if
+
+	'' Check for constant initializer?
+	'' (doing this check first, it results in a nicer error message)
+	if( (not symbHasCtor( sym )) or symbIsRef( sym ) ) then
+		if( astTypeIniIsConst( initree ) = FALSE ) then
+			errReport( FB_ERRMSG_EXPECTEDCONST )
+			astDelTree( initree )
+			initree = NULL
+			return
+		end if
+	end if
+
+	'' Check var references
+	hCheckVarsUsedInGlobalInit( sym, initree )
+end sub
 
 '' Build a NULL ptr deref with the given dtype:
 ''    *cptr(dtype ptr, 0)
@@ -808,21 +854,63 @@ private function hBuildFakeByrefInitExpr( byval dtype as integer, byval subtype 
 	function = astNewDEREF( expr )
 end function
 
+'' resolve reference to a reference
+private function hResolveRefToRefInitializer( byval dtype as integer, byval expr as ASTNODE ptr ) as ASTNODE ptr
+
+	dim tree as ASTNODE ptr = any
+	dim n as ASTNODE ptr = any
+
+	'' if initializer expr is a REF VAR, then crawl the INITREE of the var
+	'' it references for a VAR initializer.  If none found just return the 
+	'' original expr.
+
+	if( expr andalso astIsDEREF( expr ) ) then
+		if( expr->l andalso astIsVAR( expr->l ) ) then
+			if( expr->l->sym andalso symbIsRef( expr->l->sym ) andalso symbIsVar( expr->l->sym ) ) then
+				tree = expr->l->sym->var_.initree
+				if( tree andalso astIsTYPEINI( tree ) ) then
+					if( tree->l andalso tree->l->class = AST_NODECLASS_TYPEINI_ASSIGN ) then
+						n = tree->l->l
+						if( n ) then
+
+							select case astGetClass( n )
+							case AST_NODECLASS_OFFSET
+								n = n->l
+								if( n andalso astIsVAR( n ) ) then
+									'' compatible types?
+									if( astGetFullType( n ) = dtype ) then
+										astDelTree( expr )
+										expr = astCloneTree( n )
+									end if
+								end if
+							end select
+
+						end if
+					end if
+				end if
+
+			end if
+		end if
+	end if
+
+	function = expr
+
+end function
+
 private function hCheckAndBuildByrefInitializer( byval sym as FBSYMBOL ptr, byref expr as ASTNODE ptr ) as ASTNODE ptr
 	'' Check data types, CONSTness, etc.
 	var ok = astCheckByrefAssign( sym->typ, sym->subtype, expr )
 
 	'' Disallow AST nodes refering to temp vars (i.e. where addrof is
 	'' permitted) that aren't already disallowed in cVarOrDeref()
-	select case( expr->class )
-	case AST_NODECLASS_CALL
-		ok = FALSE
-	end select
+	ok and= (not astIsCALL( expr ))
 
 	if( ok = FALSE ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		astDelTree( expr )
 		expr = hBuildFakeByrefInitExpr( sym->typ, sym->subtype )
+	else
+		expr = hResolveRefToRefInitializer( sym->typ, expr )
 	end if
 
 	'' Build the TYPEINI for initializing the reference/pointer
@@ -834,9 +922,7 @@ private function hCheckAndBuildByrefInitializer( byval sym as FBSYMBOL ptr, byre
 	astTypeIniAddAssign( initree, astNewADDROF( expr ), sym, ptrdtype, ptrsubtype )
 	astTypeIniEnd( initree, TRUE )
 
-	if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED)) <> 0 ) then
-		hCheckGlobalInitializer( sym, initree )
-	end if
+	hValidateGlobalVarInit( sym, initree )
 
 	function = initree
 end function
@@ -929,56 +1015,7 @@ private function hVarInit _
 		return NULL
 	end if
 
-	'' static or shared?
-	if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED)) <> 0 ) then
-		''
-		'' In general, STATIC/SHARED var initializers must be constants,
-		'' that includes OFFSETs (address of other global symbols),
-		'' because they're emitted into .data/.bss sections, so no code
-		'' (that needs to be executed) can be allowed.
-		''
-		'' (Currently) the only exception are vars with constructors:
-		'' - the constructor must be called with certain parameters
-		'' - so code is executed, and the initializer can aswell allow
-		''   more than just constants
-		'' - temp vars are ok, because they will be duplicated as
-		''   needed by the TYPEINI scope handling
-		'' - local non-static vars cannot be allowed, since they're
-		''   from a different scope
-		''
-		'' SHARED var initializers must not reference local STATICs,
-		'' because those symbols will be deleted by the time the global
-		'' is emitted. This can only happen with STATICs from the
-		'' implicit main() because those from inside procedures aren't
-		'' visible to SHARED declarations at the toplevel.
-		''
-		'' The other way round (STATIC non-SHARED initializer using a
-		'' non-STATIC SHARED) is ok though; it will be "forward
-		'' referenced" in the .asm output, because STATICs are emitted
-		'' before globals, but it works.
-		''
-		'' Even constant initializers can reference other global vars,
-		'' in form of OFFSETs (address-of), because of this the
-		'' astTypeIniUsesLocals() check must run in both constant and
-		'' non-constant initializer cases.
-		''
-
-		'' Check for constant initializer?
-		'' (doing this check first, it results in a nicer error message)
-		if( symbHasCtor( sym ) = FALSE ) then
-			if( astTypeIniIsConst( initree ) = FALSE ) then
-				errReport( FB_ERRMSG_EXPECTEDCONST )
-				'' error recovery: discard the tree
-				astDelTree( initree )
-				exit function
-			end if
-		end if
-
-		if( hCheckGlobalInitializer( sym, initree ) = FALSE ) then
-			astDelTree( initree )
-			exit function
-		end if
-	end if
+	hValidateGlobalVarInit( sym, initree )
 
 	function = initree
 end function
@@ -1424,7 +1461,7 @@ function cVarDecl _
 			dtype = suffix
 			subtype = NULL
 			lgt = symbCalcLen( dtype, subtype )
-			addsuffix = TRUE
+			addsuffix = (suffix <> FB_DATATYPE_INVALID)
 		else
 			'' the user did 'DIM AS _____', and then
 			'' specified a suffix on a symbol, e.g.
@@ -1540,6 +1577,7 @@ function cVarDecl _
 					dtype = symbGetDefType( id )
 					subtype = NULL
 					lgt = symbCalcLen( dtype, subtype )
+					addsuffix = TRUE
 				end if
 
 				'' Potential redim, not just a variable declaration?
@@ -1997,7 +2035,7 @@ sub cArrayDecl _
 	loop while( hMatch( CHAR_COMMA ) )
 end sub
 
-private function hCheckAndBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr ) as ASTNODE ptr
+private function hBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr ) as ASTNODE ptr
 	'' build a ini-tree
 	var initree = astTypeIniBegin( sym->typ, sym->subtype, symbIsLocal( sym ) )
 
@@ -2020,20 +2058,13 @@ private function hCheckAndBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, by
 	end if
 
 	astTypeIniEnd( initree, TRUE )
-
-	if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or _
-					FB_SYMBATTRIB_SHARED)) <> 0 ) then
-		'' only if it's not an object, static or global instances are allowed
-		if( symbHasCtor( sym ) = FALSE ) then
-			if( astTypeIniIsConst( initree ) = FALSE ) then
-				'' error recovery: discard the tree
-				astDelTree( initree )
-				initree = NULL
-			end if
-		end if
-	end if
-
 	function = initree
+end function
+
+private function hCheckAndBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr ) as ASTNODE ptr
+	var initree = hBuildAutoVarInitializer( sym, expr )
+	hValidateGlobalVarInit( sym, initree )
+	return initree
 end function
 
 ''

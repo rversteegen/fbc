@@ -36,6 +36,25 @@ function astNewDEREF _
 
 			case AST_NODECLASS_OFFSET
 				delchild = (t->ofs.ofs = 0)
+			
+			case AST_NODECLASS_PTRCHK
+
+				'' convert *PTRCHK(@expr) to (expr)
+				'' TODO: remove null-ptr checks in ptr indexing
+
+				if( (t->l->class = AST_NODECLASS_ADDROF) or _
+					(t->l->class = AST_NODECLASS_OFFSET and t->l->ofs.ofs = 0) ) then
+
+					'' delete the null ptr check func call
+					astDelTree( t->r )	
+
+					'' move to ADDROF/OFFSET node
+					t = t->l
+
+					delchild = TRUE
+				else
+					delchild = FALSE
+				end if
 
 			case else
 				delchild = FALSE
@@ -43,11 +62,18 @@ function astNewDEREF _
 
 			''
 			if( delchild ) then
+
 				n = t->l
-				astDelNode( t )
-				if( t <> l ) then
+
+				'' astSkipNoConvCAST() and removing the null pointer check
+				'' may have skipped multiple nodes
+				'' delete all nodes from L to T (up to but not including N)
+
+				while( l <> n )
+					t = l->l
 					astDelNode( l )
-				end if
+					l = t
+				wend
 
 				astSetType( n, dtype, subtype )
 				return n
@@ -77,7 +103,7 @@ function astLoadDEREF( byval n as ASTNODE ptr ) as IRVREG ptr
 	'' no index? can happen with absolute addresses + ptr typecasting
 	if( l = NULL ) then
 		if( ast.doemit ) then
-			vr = irAllocVRPTR( astGetDataType( n ), n->subtype, n->ptr.ofs, NULL )
+			vr = irAllocVRPTR( astGetFullType( n ), n->subtype, n->ptr.ofs, NULL )
 			vr->vector = n->vector
 		end if
 		return vr
@@ -92,13 +118,13 @@ function astLoadDEREF( byval n as ASTNODE ptr ) as IRVREG ptr
 			(typeGetClass(v1->dtype) <> FB_DATACLASS_INTEGER) or _
 			(typeGetSize(v1->dtype) <> env.pointersize) ) then
 
-			vp = irAllocVREG( typeAddrOf( astGetDataType( n ) ), n->subtype )
+			vp = irAllocVREG( typeAddrOf( astGetFullType( n ) ), n->subtype )
 			irEmitADDR( AST_OP_DEREF, v1, vp )
 		else
 			vp = v1
 		end if
 
-		vr = irAllocVRPTR( astGetDataType( n ), n->subtype, n->ptr.ofs, vp )
+		vr = irAllocVRPTR( astGetFullType( n ), n->subtype, n->ptr.ofs, vp )
 		vr->vector = n->vector
 	end if
 

@@ -1,5 +1,5 @@
 ''  fbhelp - FreeBASIC help viewer
-''  Copyright (C) 2006-2008 Jeffery R. Marshall (coder[at]execulink.com)
+''  Copyright (C) 2006-2018 Jeffery R. Marshall (coder[at]execulink.com)
 
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -109,11 +109,6 @@ public sub HelpScreen_Show( byval pexepath as zstring ptr )
 
 		Forms_Draw( @frm, FALSE )
 
-		'' FIXME: Should be part of Forms_draw
-		if( CtlNeedUpdate( @hlp ) ) then
-			HelpBox_Update( @hlp )
-		end if
-
 		if( Screen_MouseInstalled() <> FALSE ) then
 			Screen_GetMouse( mx, my, mz, mb )
 			Controls_ProcessMouse( mx, my, mz, mb )
@@ -186,7 +181,7 @@ public sub HelpScreen_Show( byval pexepath as zstring ptr )
 								else
 									b = TRUE
 								end if
-								if( b = TRUE ) then
+								if( b ) then
 
 									if( HelpFile_SaveTopicAsText( hlp.pagename, filename ) = FALSE ) then
 										MsgBox_Show( "Error writing topic file.", NULL, 1, "OK" )
@@ -219,7 +214,7 @@ public sub HelpScreen_Show( byval pexepath as zstring ptr )
 
 		end if
 
-		if( bClose = TRUE ) then
+		if( bClose ) then
 
 			bClose = FALSE
 
@@ -234,7 +229,7 @@ public sub HelpScreen_Show( byval pexepath as zstring ptr )
 
 		endif
 
-		if( bFirstTime = TRUE ) then
+		if( bFirstTime ) then
 
 			if(( Timer - dStartTime ) > 5 ) then
 				with border

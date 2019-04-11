@@ -3,7 +3,7 @@
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
 ''
-'' See Also: http://www.freebasic.net/wiki/wikka.php?wakka=ExtLibexpat
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibexpat
 '' --------
 
 '' XML file parser command line tool based on libexpat
@@ -11,9 +11,12 @@
 '' Can use zstring or wstring (libexpat or libexpatw):
 '#define XML_UNICODE
 
-#include once "expat.bi"
+#include Once "expat.bi"
+#include Once "crt/mem.bi"
 
-#define FALSE 0
+#ifndef False
+#define False 0
+#endif
 #define NULL 0
 
 Const BUFFER_SIZE = 1024
@@ -30,8 +33,8 @@ Dim Shared As Context ctx
 Sub elementBegin cdecl _
 	( _
 		ByVal userdata As Any Ptr, _
-		ByVal element As XML_char Ptr, _
-		ByVal attributes As XML_char Ptr Ptr _
+		ByVal element As const XML_char Ptr, _
+		ByVal attributes As const XML_char Ptr Ptr _
 	)
 
 	'' Show its name
@@ -55,7 +58,7 @@ Sub elementBegin cdecl _
 End Sub
 
 '' Callback called by libexpat when end of XML tag is found
-Sub elementEnd cdecl(ByVal userdata As Any Ptr, ByVal element As XML_char Ptr)
+Sub elementEnd cdecl(ByVal userdata As Any Ptr, ByVal element As const XML_char Ptr)
 	'' Show text collected in charData() callback below
 	Print Space(ctx.nesting);ctx.text
 	ctx.text[0] = 0
@@ -66,7 +69,7 @@ End Sub
 Sub charData cdecl _
 	( _
 		ByVal userdata As Any Ptr, _
-		ByVal chars As XML_char Ptr, _  '' Note: not null-terminated
+		ByVal chars As const XML_char Ptr, _  '' Note: not null-terminated
 		ByVal length As Integer _
 	)
 
@@ -75,7 +78,7 @@ Sub charData cdecl _
 
 	'' Append to our buffer, if there still is free room, so we can print it out later
 	If (length <= (BUFFER_SIZE - ctx.textlength)) Then
-		fb_MemCopy(ctx.text[ctx.textlength], chars[0], length * SizeOf(XML_char))
+		memcpy(@ctx.text[ctx.textlength], @chars[0], length * SizeOf(XML_char))
 		ctx.textlength += length
 		ctx.text[ctx.textlength] = 0
 	End If
@@ -109,7 +112,7 @@ End Sub
 
 	Static As UByte buffer(0 To (BUFFER_SIZE-1))
 
-	Dim As Integer reached_eof = FALSE
+	Dim As Integer reached_eof = False
 	Do
 		Dim As Integer size = BUFFER_SIZE
 		Dim As Integer result = Get(#1, , buffer(0), size, size)
@@ -118,13 +121,13 @@ End Sub
 			End 1
 		End If
 
-		reached_eof = (EOF(1) <> FALSE)
+		reached_eof = (EOF(1) <> False)
 
-		If (XML_Parse(parser, @buffer(0), size, reached_eof) = FALSE) Then
+		If (XML_Parse(parser, @buffer(0), size, reached_eof) = False) Then
 			Print filename & "(" & XML_GetCurrentLineNumber(parser) & "): Error from XML parser: "
 			Print *XML_ErrorString(XML_GetErrorCode(parser))
 			End 1
 		End If
-	Loop While (reached_eof = FALSE)
+	Loop While (reached_eof = False)
 
 	XML_ParserFree(parser)

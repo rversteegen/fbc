@@ -2,7 +2,7 @@
 #define __CHTTP_BI__
 
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -23,11 +23,6 @@
 #define NULL 0
 #endif
 
-#ifndef TRUE
-#define TRUE 1
-#define FALSE 0
-#endif
-
 #include once "CHttpForm.bi"
 
 namespace fb
@@ -35,6 +30,9 @@ namespace fb
 	type CHttpCtx as CHttpCtx_
 
 	type CHttp
+
+		declare static sub GlobalInit()
+
 
 		declare constructor _
 			( _
@@ -47,7 +45,8 @@ namespace fb
 		declare function Post _
 			( _
 				byval url as zstring ptr, _
-				byval form as CHttpForm ptr _
+				byval form as CHttpForm ptr, _
+				byval ca_file as zstring ptr _
 			) as string
 
 		declare function GetHandle _

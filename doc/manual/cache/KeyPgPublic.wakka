@@ -6,12 +6,12 @@ Specifies a procedure having external linkage.
 		//..procedure body..//
 	[[KeyPgEnd|End]] [[KeyPgSub|Sub]]
 	
-	**Public** [[KeyPgFunction|Function]] //procedure_name// [[[KeyPgCdecl|Cdecl]]|[[KeyPgStdcall|Stdcall]]|[[KeyPgPascal|Pascal]]] [[[KeyPgOverload|Overload]]] [[[KeyPgAlias|Alias]] //"""external_name"""//] [([//parameter_list//])] [[KeyPgAs|as]] //return_type//  [[[KeyPgStatic|Static]]] [[[KeyPgExport|Export]]]
+	**Public** [[KeyPgFunction|Function]] //procedure_name// [[[KeyPgCdecl|Cdecl]]|[[KeyPgStdcall|Stdcall]]|[[KeyPgPascal|Pascal]]] [[[KeyPgOverload|Overload]]] [[[KeyPgAlias|Alias]] //"""external_name"""//] [([//parameter_list//])] [ [[KeyPgByrefFunction|byref]] ] [[KeyPgAs|as]] //return_type//  [[[KeyPgStatic|Static]]] [[[KeyPgExport|Export]]]
 		//..procedure body..//
 	[[KeyPgEnd|End]] [[KeyPgFunction|Function]]
 ##
 {{fbdoc item="desc"}}
-	In procedure definitions, ##**Public**## specifies that a procedure has external linkage, meaning its name is visible to external modules. If ##**Public**## or ##[[KeyPgPrivate|Private]]## is not specified, a procedure is defined as if ##**Public**## was specified.
+	In procedure definitions (forbidden at declaration line level), ##**Public**## specifies that a procedure has external linkage, meaning its name is visible to external modules. If ##**Public**## or ##[[KeyPgPrivate|Private]]## is not specified, a procedure is defined as if ##**Public**## was specified.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/module/sub-public.bas"}}%%(freebasic)

@@ -4,8 +4,6 @@ Divides two ##[[KeyPgInteger|Integer]]## expressions
 {{fbdoc item="syntax"}}##
 	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **\** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgInteger|integer]] ) [[KeyPgAs|as]] [[KeyPgInteger|integer]]
 	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **\** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] [[KeyPgUinteger|uinteger]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgUinteger|uinteger]] ) [[KeyPgAs|as]] [[KeyPgUinteger|uinteger]]
-	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **\** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] [[KeyPgLongint|longint]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgLongint|longint]] ) [[KeyPgAs|as]] [[KeyPgLongint|longint]]
-	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **\** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] [[KeyPgUlongint|ulongint]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgUlongint|ulongint]] ) [[KeyPgAs|as]] [[KeyPgUlongint|ulongint]]
 ##
 {{fbdoc item="usage"}}##
 	//result// = //lhs// **##\##** //rhs//
@@ -23,9 +21,9 @@ Divides two ##[[KeyPgInteger|Integer]]## expressions
 	**##Operator \## (Integer division)** divides two ##[[KeyPgInteger|Integer]]## expressions and returns the result. Float numeric values are converted to ##[[KeyPgInteger|Integer]]## by rounding up or down, and the fractional part of the resulting quotient is truncated.
 	
 	If the divisor (##//rhs//##) is zero (##0##), a division by zero error (crash) will be raised.
-
+	
 	Neither of the operands are modified in any way.
-
+	
 	This operator can be overloaded for user-defined types.
 
 {{fbdoc item="ex"}}

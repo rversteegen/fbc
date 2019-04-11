@@ -69,7 +69,8 @@ enum FB_COMPOPT
 	FB_COMPOPT_FORCELANG            '' boolean: TRUE if -forcelang was specified
 
 	'' debugging/error checking
-	FB_COMPOPT_DEBUG                '' boolean: -g
+	FB_COMPOPT_DEBUGINFO            '' boolean: debugging info (affects code generation)
+	FB_COMPOPT_ASSERTIONS           '' boolean: enable assert() and __FB_DEBUG__
 	FB_COMPOPT_ERRORCHECK           '' boolean: runtime error checks
 	FB_COMPOPT_RESUMEERROR          '' boolean: RESUME support
 	FB_COMPOPT_EXTRAERRCHECK        '' boolean: NULL pointer/array bounds checks
@@ -83,17 +84,26 @@ enum FB_COMPOPT
 
 	'' the rest
 	FB_COMPOPT_GOSUBSETJMP          '' boolean: implement GOSUB using setjmp/longjump?
+	FB_COMPOPT_VALISTASPTR          '' boolean: implement CVA_* using pointer expressions only?
 	FB_COMPOPT_EXPORT               '' boolean: export all symbols declared as EXPORT?
 	FB_COMPOPT_MSBITFIELDS          '' boolean: use M$'s bitfields packing?
 	FB_COMPOPT_MULTITHREADED        '' boolean: -mt
 	FB_COMPOPT_GFX                  '' boolean: -gfx (whether gfxlib should be linked)
 	FB_COMPOPT_PIC                  '' boolean: -pic (whether to use position-independent code)
 	FB_COMPOPT_STACKSIZE            '' integer
-
+	FB_COMPOPT_OBJINFO              '' boolean: write/read .fbctinf sections etc.?
 	FB_COMPOPT_SHOWINCLUDES         '' boolean: -showincludes
+	FB_COMPOPT_MODEVIEW             ''__FB_GUI__
 
 	FB_COMPOPTIONS
 end enum
+
+enum FB_MODEVIEW
+	FB_MODEVIEW_CONSOLE = 0
+	FB_MODEVIEW_GUI
+end enum
+
+const FB_DEFAULT_MODEVIEW   =  FB_MODEVIEW_CONSOLE
 
 '' pedantic checks
 enum FB_PDCHECK
@@ -105,10 +115,12 @@ enum FB_PDCHECK
 	FB_PDCHECK_NEXTVAR      = &h00000008
 	FB_PDCHECK_CASTTONONPTR = &h00000010
 	FB_PDCHECK_SIGNEDNESS   = &h00000020
+	FB_PDCHECK_CASTFUNCPTR  = &h00000040
+	FB_PDCHECK_CONSTNESS    = &h00000080
 
 	FB_PDCHECK_ALL          = &hffffffff
 
-	FB_PDCHECK_DEFAULT      = FB_PDCHECK_ALL xor ( FB_PDCHECK_NEXTVAR or FB_PDCHECK_SIGNEDNESS )
+	FB_PDCHECK_DEFAULT      = FB_PDCHECK_ALL xor ( FB_PDCHECK_NEXTVAR or FB_PDCHECK_SIGNEDNESS or FB_PDCHECK_CASTFUNCPTR or FB_PDCHECK_CONSTNESS )
 end enum
 
 '' cpu types
@@ -239,27 +251,31 @@ type FBCMMLINEOPT
 	forcelang       as integer              '' TRUE if -forcelang was specified
 
 	'' debugging/error checking
-	debug           as integer              '' true = add debug info (default = false)
+	debuginfo       as integer              '' true = add debug info (default = false)
+	assertions      as integer              '' true = enable assert() and __FB_DEBUG__ (default = false)
 	errorcheck      as integer              '' enable runtime error checks?
 	resumeerr       as integer              '' enable RESUME support?
 	extraerrchk     as integer              '' enable NULL pointer/array bounds checks?
 	profile         as integer              '' build profiling code (default = false)
 
 	'' error/warning reporting behaviour
-	warninglevel    as integer              '' (default = 0)
+	warninglevel    as integer              '' (default = FB_WARNINGMSGS_DEFAULT_LEVEL)
 	showerror       as integer              '' show line giving error (default = true)
 	maxerrors       as integer              '' max number errors the parser will show
 	pdcheckopt      as FB_PDCHECK           '' pedantic checks
 
 	'' the rest
 	gosubsetjmp     as integer              '' implement GOSUB using setjmp/longjump? (default = false)
+	valistasptr     as integer              '' implement CVA_* using pointer expressions only?
 	export          as integer              '' export all symbols declared as EXPORT (default = true)
 	msbitfields     as integer              '' use M$'s bitfields packing
 	multithreaded   as integer              '' link against thread-safe runtime library (default = false)
 	gfx             as integer              '' Link against gfx library (default = false)
 	pic             as integer              '' Whether to use position-independent code (default = false)
 	stacksize       as integer
+	objinfo         as integer
 	showincludes    as integer
+	modeview        as FB_MODEVIEW
 end type
 
 '' features allowed in the selected language
@@ -392,6 +408,7 @@ declare sub fbSetLibs(byval libs as TSTRSET ptr, byval libpaths as TSTRSET ptr)
 declare sub fbGetLibs(byval libs as TSTRSET ptr, byval libpaths as TSTRSET ptr)
 declare sub fbPragmaOnce()
 declare sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
+declare sub fbOverrideFilename(byval filename as zstring ptr)
 
 declare function fbGetTargetId( ) as string
 declare function fbGetHostId( ) as string
@@ -405,6 +422,9 @@ declare function fbGetBits( ) as integer
 declare function fbGetHostBits( ) as integer
 declare function fbGetCpuFamily( ) as integer
 declare function fbIdentifyFbcArch( byref fbcarch as string ) as integer
+declare function fbTargetSupportsELF( ) as integer
+declare function fbTargetSupportsMACHO( ) as integer
+declare function fbTargetSupportsCOFF( ) as integer
 
 declare function fbGetEntryPoint _
 	( _
@@ -447,6 +467,15 @@ declare function fbGetLangId _
 		byval txt as zstring ptr _
 	) as FB_LANG
 
+enum FB_CVA_LIST_TYPEDEF
+	FB_CVA_LIST_NONE = 0
+	FB_CVA_LIST_POINTER
+	FB_CVA_LIST_BUILTIN_POINTER
+	FB_CVA_LIST_BUILTIN_C_STD
+	FB_CVA_LIST_BUILTIN_AARCH64
+end enum
+
+declare function fbGetBackendValistType () as FB_CVA_LIST_TYPEDEF
 
 ''
 '' macros

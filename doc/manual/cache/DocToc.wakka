@@ -1,11 +1,11 @@
 {{image class="center" alt="FB Logo" title="FB Logo" url="/images/FBLOGO.PNG" link="RecentChanges"}}{{fbdoc item="title" value="FreeBASIC Manual"}}----
 @@{{fbdoc item="keyword" value="CompilerWelcome|Welcome to FreeBASIC"}} | {{fbdoc item="keyword" value="CompilerHelp|Getting Help with FreeBASIC"}}@@
 <<{{fbdoc item="section" value="Language Documentation"}}
-
+	
 	{{fbdoc item="keyword" value="CatPgFullIndex|Keywords - Alphabetical"}}
 	{{fbdoc item="keyword" value="CatPgFunctIndex|Keywords - Functional"}}
 	{{fbdoc item="keyword" value="CatPgGfx|Graphics Keywords"}}
-	{{fbdoc item="keyword" value="CatPgOpIndex|Operators List"}}
+	{{fbdoc item="keyword" value="CatPgOpIndex|Operator List"}}
 	
 	{{fbdoc item="subsect" value="Variables and Data Types"}}
 		{{fbdoc item="keyword" value="CatPgVariables|Variable Declarations"}}
@@ -13,17 +13,17 @@
 		{{fbdoc item="keyword" value="CatPgStdDataTypes|Standard Data Types"}}
 		{{fbdoc item="keyword" value="TblVarTypes|Standard Data Type Limits"}}
 		{{fbdoc item="keyword" value="CatPgCasting|Converting Between Data Types"}}
-	
+		
 	{{fbdoc item="subsect" value="Operators"}}
-		{{fbdoc item="keyword" value="CatPgOperators|Operators"}}
+		{{fbdoc item="keyword" value="CatPgOperators|Operator Overview"}}
 		{{fbdoc item="keyword" value="OpPrecedence|Operator Precedence"}}
 		{{fbdoc item="keyword" value="TblTruth|Bitwise Operators & Truth Tables"}}
-	
+		
 	{{fbdoc item="subsect" value="Statements"}}
 		{{fbdoc item="keyword" value="CatPgControlFlow|Control Flow"}}
 		{{fbdoc item="keyword" value="CatPgProcedures|Procedures"}}
 		{{fbdoc item="keyword" value="CatPgModularizing|Modularizing"}}
-	
+		
 	{{fbdoc item="subsect" value="Other"}}
 		{{fbdoc item="keyword" value="CatPgPreProcess|Preprocessor"}}
 		{{fbdoc item="keyword" value="TblEscapeSequences|Escape Sequences In String Literals"}}
@@ -33,7 +33,7 @@
 		{{fbdoc item="keyword" value="KeyPgAsm|Inline ASM"}}
 
 {{fbdoc item="section" value="Runtime Library Reference"}}
-
+	
 	{{fbdoc item="keyword" value="CatPgArray|Array Functions"}}
 	{{fbdoc item="keyword" value="CatPgBits|Bit Manipulation"}}
 	{{fbdoc item="keyword" value="CatPgConsole|Console Functions"}}
@@ -46,9 +46,9 @@
 	{{fbdoc item="keyword" value="CatPgString|String Functions"}}
 	{{fbdoc item="keyword" value="CatPgThreading|Threading Support Functions"}}
 	{{fbdoc item="keyword" value="CatPgInput|User Input Functions"}}
-
+	
 {{fbdoc item="section" value="Graphics Library Reference"}}
-
+	
 	{{fbdoc item="keyword" value="CatPgGfx2D|2D Drawing Functions"}}
 	{{fbdoc item="keyword" value="CatPgGfxInput|User Input Functions"}}
 	{{fbdoc item="keyword" value="CatPgGfxScreen|Screen Functions"}}
@@ -56,16 +56,16 @@
 	{{fbdoc item="keyword" value="GfxLib|Supported graphics drivers (backends)"}}
 	{{fbdoc item="keyword" value="GfxScancodes|Keyboard Scan Codes"}}
 	{{fbdoc item="keyword" value="GfxDefPalettes|Default Palettes"}}
-
+	
 <<>>{{fbdoc item="section" value="Tutorials"}}
-
+	
 	{{fbdoc item="keyword" value="CatPgProgrammer|Programmer's Guide"}}
 	{{fbdoc item="keyword" value="CommunityTutorials|Community Tutorials"}}
 	{{fbdoc item="keyword" value="CodeLibrary|Community Code Library"}}
 	{{fbdoc item="keyword" value="ExtLibTOC|External Libraries Index"}}
-
+	
 {{fbdoc item="section" value="Using the FreeBASIC compiler"}}
-
+	
 	{{fbdoc item="keyword" value="CompilerInstalling|Installing FreeBASIC"}} | {{fbdoc item="keyword" value="CompilerRequirements|Requirements"}}
 	{{fbdoc item="keyword" value="CompilerRunning|Running FreeBASIC"}}
 	{{fbdoc item="keyword" value="CompilerCmdLine|Using the Command Line"}} | {{fbdoc item="keyword" value="CatPgCompOpt|Command Line Options"}}
@@ -74,14 +74,15 @@
 	
 	{{fbdoc item="keyword" value="CompilerErrMsg|Compiler Error Messages"}}
 	{{fbdoc item="keyword" value="CompilerTools|Tools used by fbc"}}
-
+	{{fbdoc item="keyword" value="CompilerInstallingGcc|Installing gcc for -gen gcc"}}
+	
 {{fbdoc item="section" value="FreeBASIC dialects and QBASIC"}}
-
+	
 	{{fbdoc item="keyword" value="CompilerQB|FreeBASIC and Qbasic"}} | 	{{fbdoc item="keyword" value="LangQB|Differences from QB"}}
 	{{fbdoc item="keyword" value="CompilerDialects|FreeBASIC Dialects"}}
-
+	
 {{fbdoc item="section" value="FAQs"}}
-
+	
 	{{fbdoc item="keyword" value="CompilerFAQ|Compiler FAQ"}}
 	{{fbdoc item="keyword" value="FaqPggfxlib2|Graphics Library FAQ"}}
 	{{fbdoc item="keyword" value="FaqPgrtlib|Runtime Library FAQ"}}
@@ -89,9 +90,9 @@
 	{{fbdoc item="keyword" value="FaqDOS|DOS related FAQ"}}
 	{{fbdoc item="keyword" value="FaqPgWin32|Windows related FAQ"}}
 	{{fbdoc item="keyword" value="FaqPgLinux|Linux related FAQ"}}
-
+	
 {{fbdoc item="section" value="Miscellaneous"}}
-
+	
 	{{fbdoc item="keyword" value="ObsoletedKwds|Obsolete Keywords"}}
 	{{fbdoc item="keyword" value="GlossaryIndex|Glossary"}}
 	{{fbdoc item="keyword" value="CatPgMisc|Miscellaneous Keywords"}}
@@ -100,10 +101,10 @@
 	{{fbdoc item="keyword" value="TblRuntimeErrors|Runtime Error Codes"}}
 	{{fbdoc item="keyword" value="TblComparisonC|C/C++ vs. FreeBASIC syntax comparison"}}
 	{{fbdoc item="keyword" value="TblComparisonCTypes|C/C++ vs. FreeBASIC integer data type comparison"}}
-
+	
 {{fbdoc item="section" value="Hacking on FreeBASIC"}}
-
-		{{fbdoc item="keyword" value="DevToc|Developer's Table of Contents"}}
+	
+	{{fbdoc item="keyword" value="DevToc|Developer's Table of Contents"}}
 
 >>::c::
 

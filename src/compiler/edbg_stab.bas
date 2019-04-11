@@ -71,7 +71,8 @@ declare function hGetDataType _
 		11, _                                   '' single
 		12, _                                   '' double
 		13, _                                   '' string
-		14 _                                    '' fix-len string
+		14, _                                   '' fix-len string
+		17  _                                   '' va_list
 	}
 
 	dim shared stabsTb(0 to ...) as const zstring ptr = _
@@ -91,7 +92,8 @@ declare function hGetDataType _
 		@"string:t13=s12data:15,0,32;len:1,32,32;size:1,64,32;;", _
 		@"fixstr:t14=-2", _
 		@"pchar:t15=*4;", _  '' used for the data ptr in the string:t13 declaration only
-		@"boolean:t16=@s8;-16" _
+		@"boolean:t16=@s8;-16", _
+		@"va_list:t17=-11" _
 	}
 
 sub edbgInit( )
@@ -207,14 +209,16 @@ end sub
 sub edbgEmitHeader( byval filename as zstring ptr )
 	dim as string lname
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
 	ctx.typecnt 	= 1
 	ctx.label 		= NULL
 	ctx.incfile 	= NULL
-	ctx.filename	= *filename
+
+	'' ctx.filename is never used
+	ctx.filename   = *filename
 
 	'' emit source file name
 	lname = *symbUniqueLabel( )
@@ -240,14 +244,13 @@ sub edbgEmitHeader( byval filename as zstring ptr )
 
 	emitWriteStr( "" )
 
-	hEmitSTABS( STAB_TYPE_BINCL, filename, 0, 0 )
 end sub
 
 '':::::
 sub edbgEmitFooter( ) static
 	dim as string lname
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -266,12 +269,13 @@ sub edbgLineBegin _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval lnum as integer, _
-		byval pos_ as integer _
+		byval pos_ as integer, _
+		ByVal filename As zstring ptr _
 	)
 
-    if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
     	exit sub
-    end if
+	end if
 
     if( ctx.lnum > 0 ) then
     	ctx.pos = pos_ - ctx.pos
@@ -281,6 +285,8 @@ sub edbgLineBegin _
     	end if
     end if
 
+    edbgInclude( filename )
+   
     ctx.pos = pos_
     ctx.lnum = lnum
     if( ctx.isnewline ) then
@@ -299,7 +305,7 @@ sub edbgLineEnd _
 		byval pos_ as integer _
 	)
 
-    if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
     	exit sub
     end if
 
@@ -324,7 +330,7 @@ sub edbgEmitLine _
 
     dim as zstring ptr s
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -352,7 +358,7 @@ sub edbgEmitLineFlush _
 		byval label as FBSYMBOL ptr _
 	) static
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -371,7 +377,7 @@ sub edbgScopeBegin _
 
 	'' called by ir->ast
 
-    if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
     	exit sub
     end if
 
@@ -388,7 +394,7 @@ sub edbgScopeEnd _
 
 	'' called by ir->ast
 
-    if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
     	exit sub
     end if
 
@@ -403,7 +409,7 @@ sub edbgEmitScopeINI _
 		byval s as FBSYMBOL ptr _
 	) static
 
-    if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
     	exit sub
     end if
 
@@ -417,7 +423,7 @@ sub edbgEmitScopeEND _
 		byval s as FBSYMBOL ptr _
 	) static
 
-    if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
     	exit sub
     end if
 
@@ -483,7 +489,7 @@ sub edbgEmitProcHeader _
 
     dim as string desc, procname
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -530,7 +536,7 @@ sub edbgEmitProcHeader _
 
 	''
 	ctx.isnewline = TRUE
-	ctx.lnum	  = 0
+	ctx.lnum      = 0
 	ctx.pos	  	  = 0
 	ctx.label	  = NULL
 
@@ -627,7 +633,7 @@ sub edbgEmitProcFooter _
 
     dim as string procname, lname
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -645,7 +651,7 @@ sub edbgEmitProcFooter _
 
 	''
 	ctx.isnewline = TRUE
-	ctx.lnum	  = 0
+	ctx.lnum      = 0
 	ctx.pos	  	  = 0
 	ctx.label	  = NULL
 
@@ -889,7 +895,7 @@ sub edbgEmitGlobalVar _
 	dim as integer t = any, attrib = any
 	dim as string desc
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -952,7 +958,7 @@ sub edbgEmitLocalVar _
 	dim as integer t = any
 	dim as string desc, value
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -992,7 +998,7 @@ end sub
 sub edbgEmitProcArg( byval sym as FBSYMBOL ptr )
 	dim as string desc
 
-	if( env.clopt.debug = FALSE ) then
+	if( env.clopt.debuginfo = FALSE ) then
 		exit sub
 	end if
 
@@ -1015,40 +1021,31 @@ end sub
 sub edbgInclude( byval incfile as zstring ptr )
 	dim as string lname
 
-	'' incfile is the new include file for which we should open a block.
-	'' incfile can be NULL to indicate that no next include file is coming,
-	'' in which case we just want to return to the toplevel .bas file name,
-	'' if we previously opened an include file block.
+	'' NOTE: originally, fbc used STAB_TYPE_BINCL and STAB_TYPE_EINCL
+	'' to mark the beginning and end of an include file.  The purpose
+	'' for these markers is so the linker (LD) can remove duplicate
+	'' debug type information from the final EXE.  However, because
+	'' fbc only emits types actually used, the end result is that
+	'' type information from a header (.BI) is often different from
+	'' one object module to another is generally not used in the
+	'' way that BINCL/EINCL/EXCL was intented.
 
-	'' Already in the correct block?
-	'' (same include file, or NULL for toplevel)
-	if( incfile = ctx.incfile ) then
+	'' incfile is the new include file or main file name
+
+	'' coming from _close incfile is null so no real need to change
+	If( incfile = NULL )Then
+		Exit Sub
+	EndIf
+
+	'' Already handling the correct name
+	if( incfile = ctx.incfile ) Then
 		exit sub
-	end if
+	end If
 
-	'' Currently in an include file block?
-	if( ctx.incfile ) then
-		'' Close it
-		hEmitSTABS( STAB_TYPE_EINCL, "", 0, 0 )
-
-		'' "Return" to the main filename, if no new include file block
-		'' will be opened
-		if( incfile = NULL ) then
-			emitSECTION( IR_SECTION_CODE, 0 )
-			lname = *symbUniqueLabel( )
-			hEmitSTABS( STAB_TYPE_SOL, ctx.filename, 0, 0, lname )
-			hLABEL( lname )
-		end if
-	end if
+	emitSECTION( IR_SECTION_CODE, 0 )
+	lname = *symbUniqueLabel( )
+	hEmitSTABS( STAB_TYPE_SOL, incfile, 0, 0, lname )
+	hLABEL( lname )
 
 	ctx.incfile = incfile
-
-	'' Open new include file block if needed
-	if( incfile ) then
-		hEmitSTABS( STAB_TYPE_BINCL, incfile, 0, 0 )
-		emitSECTION( IR_SECTION_CODE, 0 )
-		lname = *symbUniqueLabel( )
-		hEmitSTABS( STAB_TYPE_SOL, incfile, 0, 0, lname )
-		hLABEL( lname )
-	end if
 end sub

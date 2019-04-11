@@ -11,11 +11,11 @@
 #     to build (or a tag/branch name).
 #
 # The standalone fbc is built in the same directory as the normal fbc, by just
-# rebuilding src/compiler/obj/fbc.o (that's all that's affected by
+# rebuilding src/compiler/obj/$fbtarget/fbc.o (that's all that's affected by
 # ENABLE_STANDALONE, except for the directory layout). This way we avoid
 # unnecessary full rebuilds.
 #
-# ./build.sh <target> <fbc-commit-id>
+# ./build.sh <target> <fbc-commit-id> [--offline] [--repo url] [--remote name]
 #
 # <target> can be one of:
 #   dos
@@ -34,6 +34,25 @@
 #       the FB makefile's uname check in order to build for 64bit instead of
 #       32bit.
 #
+# <fbc-commit-id>
+#   can be:
+#       - a SHA-1 hash to refer to a specific commit
+#       - a branch or tag name in origin remote
+#       - a remote branch or tag name, must specify "remote-name/branch".
+#
+# --offline
+#   when given, build.sh will stop with exit code 1 if the file is not already in
+#   in the download cache.
+#
+# --repo url
+#   specify an additional repo url to fetch in to the local repo other than the 
+#   official https://github.com/freebasic/fbc.git repo.
+#
+# --remote name
+#   specifies the remote name to add and use when referring to the other repo url.
+#   remote name will default to 'other' if the --repo option was given.
+#   remote name will default to 'origin' if the --repo option was not given.
+#
 # Requirements:
 #   - MSYS environment on Windows with: bash, wget/curl, zip, unzip, patch, make, findutils
 #     (win32/win64 builds need to be able to run ./configure scripts, to build libffi)
@@ -50,31 +69,70 @@
 # 
 # TODO:
 #   - win32: fbdoc CHM
-#   - win32/win64: build libcunit too, package the libffi/libcunit builds
+#   - package libffi
 #
 set -e
 
 usage() {
-	echo "usage: ./build.sh dos|linux-x86|linux-x86_64|win32|win32-mingworg|win64 <fbc commit id>"
+	echo "usage: ./build.sh dos|linux-x86|linux-x86_64|win32|win32-mingworg|win64 <fbc commit id> [--offline] [--repo url] [--remote name]"
 	exit 1
 }
 
-target="$1"
-case "$target" in
+# parse command line arguments
+while [[ $# -gt 0 ]] 
+do
+arg="$1"
+case $arg in
+--offline)
+	offline=Y
+	shift
+	;;
+--repo)
+	repo_url="$2"
+	shift; shift
+	;;
+--remote)
+	remote_name="$2"
+	shift; shift
+	;;
 dos|linux-x86|linux-x86_64|win32|win64)
-	fbtarget=$target;;
+	target="$1"
+	fbtarget=$target
+	shift
+	;;
 win32-mingworg)
-	fbtarget=win32;;
+	target="$1"
+	fbtarget=win32
+	shift
+	;;
 *)
-	usage;;
+	fbccommit="$1"
+	shift
+	;;	
 esac
+done
 
-fbccommit="$2"
-if [ -z "$fbccommit" ]; then
+# need a target and a commit id
+if [ -z "$target" -o -z "$fbccommit" ]; then
 	usage
 fi
 
+# default values if none given
+offline=${offline:-N}
+
+# if we have an alternate repo url, then set a default value for the remote name
+# otherwise we are only using the official repo, so set the remote name to origin
+if [ ! -z "$repo_url" ]; then
+	remote_name=${remote_name:-other}
+else
+	remote_name=${remote_name:-origin}
+fi
+
 echo "building FB-$target (uname = `uname`, uname -m = `uname -m`)"
+echo "from repository: https://github.com/freebasic/fbc.git"
+if [ ! -z "$repo_url" ]; then
+	echo "from repository: $repo_url"
+fi
 mkdir -p input
 mkdir -p output
 rm -rf build
@@ -82,14 +140,32 @@ mkdir build
 
 echo "updating input/fbc repo"
 cd input
+
+# origin/master must be the official repo, always get it first
 if [ ! -d fbc ]; then
-	git clone https://github.com/freebasic/fbc.git
+	git clone "https://github.com/freebasic/fbc.git" fbc
 fi
+
 cd fbc
-git fetch
-git fetch --tags
+
+git fetch origin
+git fetch --tags origin
 git remote prune origin
 git reset --hard origin/master
+
+# if given an alternate repo url, then make sure the
+# remote name refers to the alternate repo url
+if [ ! -z "$repo_url" ]; then
+	if git remote | grep -Fxq "$remote_name"; then
+		git remote remove "$remote_name"
+	fi
+	git remote add "$remote_name" "$repo_url"
+	git fetch "$remote_name"
+	git fetch --tags "$remote_name"
+	git remote prune "$remote_name"
+	git reset --hard "$fbccommit"
+fi
+
 cd ../..
 
 cd build
@@ -98,6 +174,23 @@ buildinfo=../output/buildinfo-$target.txt
 echo "fbc $fbccommit $target, build based on:" > $buildinfo
 echo >> $buildinfo
 
+copyfile() {
+	srcfile="$1"
+	dstfile="$2"
+	
+	if [ -f "$dstfile" ]; then
+		echo "cached      $dstfile"
+	else
+		if [ -f "$srcfile" ]; then
+			echo "copying $srcfile to $dstfile"
+			cp -p "$srcfile" "$dstfile"
+		else
+			echo "$srcfile not found, stopping"
+			exit 1
+		fi
+	fi
+}
+
 download() {
 	filename="$1"
 	url="$2"
@@ -105,12 +198,18 @@ download() {
 	if [ -f "../input/$filename" ]; then
 		echo "cached      $filename"
 	else
-		echo "downloading $filename"
-		#if ! wget -O "../input/$filename" "$url"; then
-		if ! curl -L -o "../input/$filename" "$url"; then
-			echo "download failed"
-			rm -f "../input/$filename"
+		if [ $offline = "Y" ]; then
+			echo "not cached  $filename"
+			echo "in offline mode, stopping"
 			exit 1
+		else
+			echo "downloading $filename"
+			#if ! wget -O "../input/$filename" "$url"; then
+			if ! curl -L -o "../input/$filename" "$url"; then
+				echo "download failed"
+				rm -f "../input/$filename"
+				exit 1
+			fi	
 		fi
 	fi
 
@@ -150,38 +249,50 @@ dos)
 		download "DJGPP/${package}.zip" "${DJGPP_MIRROR}${dir}${package}.zip"
 	}
 
-	djver=204
-	gccver=492
-	djgppgccversiondir=4.92
-	bnuver=225
+   	djver=205
+	gccver=710
+	djgppgccversiondir=7
+	bnuver=229
 	gdbver=771
+	djpkg=current
 
 	# binutils/gcc/gdb (needs updating to new versions)
-	download_djgpp beta/v2gnu/ bnu${bnuver}b
-	download_djgpp beta/v2gnu/ gcc${gccver}b
-	download_djgpp beta/v2gnu/ gpp${gccver}b
-	download_djgpp beta/v2gnu/ gdb${gdbver}b
+	download_djgpp ${djpkg}/v2gnu/ bnu${bnuver}b
+	download_djgpp ${djpkg}/v2gnu/ gcc${gccver}b
+	download_djgpp ${djpkg}/v2gnu/ gpp${gccver}b
+	download_djgpp ${djpkg}/v2gnu/ gdb${gdbver}b
 
 	# rest to complete the DJGPP install (usually no changes needed)
-	download_djgpp beta/v2/ djdev${djver}
-	download_djgpp beta/v2gnu/ fil41b
-	download_djgpp beta/v2gnu/ mak40b
-	download_djgpp beta/v2gnu/ shl2011b
+	download_djgpp ${djpkg}/v2/ djdev${djver}
+
+	download_djgpp ${djpkg}/v2gnu/ fil41br2
+	download_djgpp ${djpkg}/v2gnu/ mak421b
+	download_djgpp ${djpkg}/v2gnu/ shl2011br2
+	download_djgpp ${djpkg}/v2gnu/ pth207b 
+
+	download_djgpp ${djpkg}/v2tk/ ls080b 
 
 	# Sources for stuff that goes into the FB-dos package (needs updating to new versions)
-	download_djgpp beta/v2gnu/ bnu${bnuver}s
-	download_djgpp beta/v2gnu/ gcc${gccver}s
-	download_djgpp beta/v2gnu/ gdb${gdbver}s
-	download_djgpp beta/v2/    djlsr${djver}
+	download_djgpp ${djpkg}/v2gnu/ bnu${bnuver}s
+	download_djgpp ${djpkg}/v2gnu/ gcc${gccver}s
+	download_djgpp ${djpkg}/v2gnu/ gdb${gdbver}s
+	download_djgpp ${djpkg}/v2/    djlsr${djver}
 
-	unzip -q ../input/DJGPP/djdev${djver}.zip
-	unzip -q ../input/DJGPP/shl2011b.zip
-	unzip -q ../input/DJGPP/fil41b.zip
-	unzip -q ../input/DJGPP/mak40b.zip
-	unzip -q ../input/DJGPP/gdb${gdbver}b.zip
-	unzip -q ../input/DJGPP/bnu${bnuver}b.zip
-	unzip -q ../input/DJGPP/gcc${gccver}b.zip
-	unzip -q ../input/DJGPP/gpp${gccver}b.zip
+	unzip -qo ../input/DJGPP/djdev${djver}.zip
+	
+	unzip -qo ../input/DJGPP/shl2011br2.zip
+	unzip -qo ../input/DJGPP/fil41br2.zip
+	unzip -qo ../input/DJGPP/mak421b.zip
+	unzip -qo ../input/DJGPP/pth207b.zip
+
+	unzip -qo ../input/DJGPP/ls080b.zip
+	
+	unzip -qo ../input/DJGPP/gdb${gdbver}b.zip
+	unzip -qo ../input/DJGPP/bnu${bnuver}b.zip
+	unzip -qo ../input/DJGPP/gcc${gccver}b.zip
+	unzip -qo ../input/DJGPP/gpp${gccver}b.zip
+	
+	patch -p0 < ../djgpp-fix-pthread.patch
 	;;
 win32)
 	get_mingww64_toolchain 32 i686
@@ -219,7 +330,13 @@ win32-mingworg)
 	download_extract_mingw mpfr-3.1.2-2-mingw32-dll.tar.lzma
 
 	# Add ddraw.h and dinput.h for FB's gfxlib2
-	download dx80_mgw.zip http://alleg.sourceforge.net/files/dx80_mgw.zip
+
+    # if ddraw.h & dinput.h were added manually:
+	# copyfile "../input/MinGW.org/ddraw.h" "include/ddraw.h"
+	# copyfile "../input/MinGW.org/dinput.h" "include/dinput.h"
+
+	# download link for dx80_mgw.zip from https://liballeg.org/old.html
+	download dx80_mgw.zip https://download.tuxfamily.org/allegro/files/dx80_mgw.zip
 	unzip ../input/dx80_mgw.zip include/ddraw.h include/dinput.h
 
 	# Work around http://sourceforge.net/p/mingw/bugs/2039/
@@ -231,7 +348,7 @@ win64)
 	;;
 esac
 
-bootfb_title=FreeBASIC-1.04.0-$fbtarget
+bootfb_title=FreeBASIC-1.05.0-$fbtarget
 
 case $fbtarget in
 linux*)
@@ -319,14 +436,17 @@ EOF
 	cmd /c build.bat
 
 	echo "building standalone fbc:"
-	rm fbc/src/compiler/obj/fbc.o
+	rm fbc/src/compiler/obj/$fbtarget/fbc.o
 	cmd /c buildsa.bat
 
 	mkdir -p fbc/bin/dos
 	cp bin/ar.exe bin/as.exe bin/gdb.exe bin/gprof.exe bin/ld.exe fbc/bin/dos/
+	cp bin/dxe3gen.exe fbc/bin/dos/
 	cp lib/crt0.o lib/gcrt0.o lib/libdbg.a lib/libemu.a lib/libm.a fbc/lib/dos/
 	cp lib/libstdcxx.a fbc/lib/dos/libstdcx.a
 	cp lib/libsupcxx.a fbc/lib/dos/libsupcx.a
+	cp lib/libsocket.a fbc/lib/dos/libsocket.a
+	cp lib/libpthread.a fbc/lib/dos/libpthread.a
 	cp lib/gcc/djgpp/$djgppgccversiondir/libgcc.a fbc/lib/dos/
 
 	cd fbc
@@ -358,11 +478,19 @@ linuxbuild() {
 	cp fbc/contrib/manifest/FreeBASIC-$fbtarget.lst ../output
 }
 
-windowsbuild() {
-	# Add our toolchain's bin/ to the PATH, so hopefully we'll only use
-	# its gcc and not one from the host
-	origPATH="$PATH"
-	export PATH="$PWD/bin:$PATH"
+libffibuild() {
+
+	# do we already have the files we need?
+	if [ -f "../input/$libffi_title/$target/ffi.h" ]; then
+	if [ -f "../input/$libffi_title/$target/ffitarget.h" ]; then
+	if [ -f "../input/$libffi_title/$target/libffi.a" ]; then
+		echo
+		echo "using cached libffi: $libffi_title/$target"
+		echo
+		return
+	fi
+	fi
+	fi
 
 	echo
 	echo "building libffi"
@@ -372,16 +500,32 @@ windowsbuild() {
 	cd "$libffi_build"
 	if [ "$target" = win64 ]; then
 		CFLAGS=-O2 ../$libffi_title/configure --disable-shared --enable-static --build=x86_64-w64-mingw32 --host=x86_64-w64-mingw32
+	elif [ "$target" = win32 ]; then
+		# force host even for 32-bit, we might be cross compiling from x86_64 to x86
+		CFLAGS=-O2 ../$libffi_title/configure --disable-shared --enable-static --host=i686-w64-mingw32
 	else
 		CFLAGS=-O2 ../$libffi_title/configure --disable-shared --enable-static
 	fi
 	make
-	case "$target" in
-	win32)		cp include/ffi.h include/ffitarget.h ../i686-w64-mingw32/include;;
-	win32-mingworg)	cp include/ffi.h include/ffitarget.h ../include;;
-	win64)		cp include/ffi.h include/ffitarget.h ../x86_64-w64-mingw32/include;;
-	esac
+	# stash some files in the input folder to make rebuilding faster
+	mkdir -p ../../input/$libffi_title/$target
+	cp include/ffi.h include/ffitarget.h ../../input/$libffi_title/$target
+	cp .libs/libffi.a ../../input/$libffi_title/$target 
 	cd ..
+}
+
+windowsbuild() {
+	# Add our toolchain's bin/ to the PATH, so hopefully we'll only use
+	# its gcc and not one from the host
+	origPATH="$PATH"
+	export PATH="$PWD/bin:$PATH"
+
+    libffibuild
+   	case "$target" in
+	win32)			cp ../input/$libffi_title/$target/ffi.h ../input/$libffi_title/$target/ffitarget.h ./i686-w64-mingw32/include;;
+	win32-mingworg)	cp ../input/$libffi_title/$target/ffi.h ../input/$libffi_title/$target/ffitarget.h ./include;;
+	win64)			cp ../input/$libffi_title/$target/ffi.h ../input/$libffi_title/$target/ffitarget.h ./x86_64-w64-mingw32/include;;
+	esac
 
 	cd fbc
 	echo
@@ -400,7 +544,7 @@ windowsbuild() {
 	echo
 	echo "building standalone fbc"
 	echo
-	rm src/compiler/obj/fbc.o
+	rm src/compiler/obj/$fbtarget/fbc.o
 	make ENABLE_STANDALONE=1
 	cd ..
 
@@ -437,16 +581,16 @@ windowsbuild() {
 		;;
 	esac
 
-	# TODO: GoRC.exe should really be taken from its homepage
-	# <http://www.godevtool.com/>, but it was offline today
-	cp $bootfb_title/bin/$fbtarget/GoRC.exe		fbc/bin/$fbtarget
-
-	cp "$libffi_build"/.libs/libffi.a	fbc/lib/$fbtarget
+	cp ../input/$libffi_title/$target/libffi.a	fbc/lib/$fbtarget
 
 	# Reduce .exe sizes by dropping debug info
 	# (this was at least needed for MinGW.org's gdb, and probably nothing else,
 	# but it shouldn't hurt either)
 	strip -g fbc/bin/$fbtarget/*
+
+	# get GoRC.exe from author site
+	download "Gorc.zip" "http://www.godevtool.com/Gorc.zip"
+	unzip ../input/Gorc.zip GoRC.exe -d fbc/bin/$fbtarget
 
 	cd fbc
 	case "$target" in

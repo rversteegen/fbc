@@ -190,7 +190,7 @@ sub emitFlush( )
 			cast( EMIT_JTBCB, emit.opFnTb[EMIT_OP_JMPTB] )( n->jtb.tbsym, _
 				n->jtb.values, n->jtb.labels, _
 				n->jtb.labelcount, n->jtb.deflabel, _
-				n->jtb.minval, n->jtb.maxval )
+				n->jtb.bias, n->jtb.span )
 
 			deallocate( n->jtb.values )
 			deallocate( n->jtb.labels )
@@ -204,7 +204,8 @@ sub emitFlush( )
 		case EMIT_NODECLASS_DBG
 			cast( EMIT_DBGCB, emit.opFnTb[n->dbg.op] )( n->dbg.sym, _
 												   		n->dbg.lnum, _
-												   		n->dbg.pos )
+												   		n->dbg.pos, _
+												   		n->dbg.filename )
 
 		end select
 
@@ -456,7 +457,8 @@ private function hNewDBG _
 		byval op as integer, _
 		byval sym as FBSYMBOL ptr, _
 		byval lnum as integer = 0, _
-		byval pos_ as integer = 0 _
+		byval pos_ as integer = 0, _
+		byval filename As zstring ptr = 0  _
 	) as EMIT_NODE ptr static
 
 	dim as EMIT_NODE ptr n
@@ -466,6 +468,7 @@ private function hNewDBG _
 	n->dbg.op = op
 	n->dbg.sym = sym
 	n->dbg.lnum = lnum
+	n->dbg.filename = filename
 	n->dbg.pos = pos_
 
 	function = n
@@ -1460,8 +1463,8 @@ function emitJMPTB _
 		byval labels1 as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	) as EMIT_NODE ptr
 
 	dim as EMIT_NODE ptr n = any
@@ -1485,8 +1488,8 @@ function emitJMPTB _
 	n->jtb.labels = labels
 	n->jtb.labelcount = labelcount
 	n->jtb.deflabel = deflabel
-	n->jtb.minval = minval
-	n->jtb.maxval = maxval
+	n->jtb.bias = bias
+	n->jtb.span = span
 
 	function = n
 end function
@@ -1632,10 +1635,11 @@ end function
 function emitDBGLineBegin _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval lnum as integer _
+		byval lnum as integer, _
+		byval filename As zstring ptr _
 	) as EMIT_NODE ptr
 
-	function = hNewDBG( EMIT_OP_LINEINI, proc, lnum, emit.pos )
+	function = hNewDBG( EMIT_OP_LINEINI, proc, lnum, emit.pos, filename )
 
 end function
 

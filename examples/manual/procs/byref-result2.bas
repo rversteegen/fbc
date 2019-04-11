@@ -3,7 +3,7 @@
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
 ''
-'' See Also: http://www.freebasic.net/wiki/wikka.php?wakka=KeyPgByrefFunction
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgByrefFunction
 '' --------
 
 Dim Shared As String s
@@ -14,16 +14,20 @@ Function f1( ) ByRef As String
 End Function
 
 Function f2( ByRef _s As String ) ByRef As String
-   '' This variable-length string will be returned by reference, no copy will be created.
+   '' This variable-length string will transit by reference (input and output), no copy will be created.
    Function = _s
 End Function
 
 s = "abcd"
 Print s
 
-f1( ) &= "efgh"
+f1( ) = f1( ) & "efgh"
 Print s
 
-'' At time of writing, the enclosing parentheses are required here.
-( f2( s ) ) &= "ijkl"
+'' The enclosing parentheses are required here on the left-hand side.
+( f2( s ) ) = f2( s ) & "ijkl"
+Print s
+
+'' The enclosing parentheses are not required here on the left-hand side.
+f2( s ) => f2( s ) & "mnop"
 Print s

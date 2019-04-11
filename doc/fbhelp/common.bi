@@ -1,9 +1,17 @@
 #ifndef __COMMON_BI__
 #define __COMMON_BI__
 
-#define FALSE 0
-#define TRUE 1
+#ifndef NULL
 #define NULL 0
+#endif
+
+#ifndef FALSE
+const FALSE = 0
+#endif
+
+#ifndef TRUE
+const TRUE = not FALSE
+#endif
 
 type rect_t
 	x as integer

@@ -1,7 +1,7 @@
-# cunit-tests.mk
+# log-tests.mk
 # This file is part of the FreeBASIC test suite
 #
-# make file for building non-cunit tests
+# make file for building non-fbcunit tests
 #
 
 # ------------------------------------------------------------------------
@@ -28,8 +28,6 @@ endif
 
 # verify the FB_LANG option
 # - must be set to a valid -lang option
-$
-
 ifeq ($(FB_LANG),)
 $(error FB_LANG option must be specified)
 endif
@@ -63,12 +61,24 @@ ifeq ($(DIRLIST),)
 $(error No directories specified in $(DIRLIST_INC))
 endif
 
+ifndef ENABLE_CHECK_BUGS
+ENABLE_CHECK_BUGS :=
+endif
+
+ifndef ENABLE_CONSOLE_OUTPUT
+ENABLE_CONSOLE_OUTPUT :=
+endif
+
 .SUFFIXES:
 .SUFFIXES: .bmk .bas
 
 # ------------------------------------------------------------------------
 
 LOG_TESTS_INC := log-tests-$(FB_LANG).inc
+LOG_TESTS_LOG_LST := log-tests-log-$(FB_LANG).lst
+LOG_TESTS_OBJ_LST := log-tests-obj-$(FB_LANG).lst
+
+LOG_TESTS_RESULTS_LOG := log-tests-results-$(FB_LANG).log
 FAILED_LOG_TESTS_INC := failed-log-tests-$(FB_LANG).inc
 FAILED_LOG := failed-$(FB_LANG).log
 
@@ -109,18 +119,15 @@ OBJLIST_COMPILE_ONLY_FAIL := $(addsuffix .o,$(basename $(SRCLIST_COMPILE_ONLY_FA
 LOGLIST_COMPILE_ONLY_FAIL := $(addsuffix .log,$(basename $(SRCLIST_COMPILE_ONLY_FAIL)))
 
 # COMPILE_AND_RUN_OK
-ifeq ($(ALLOW_CUNIT),1)
-SRCLIST_COMPILE_AND_RUN_OK += $(SRCLIST_CUNIT)
-endif
 SRCLIST_COMPILE_AND_RUN_OK := $(filter %.bas,$(patsubst %.bmk,%.bas,$(SRCLIST_COMPILE_AND_RUN_OK)))
 OBJLIST_COMPILE_AND_RUN_OK := $(addsuffix .o,$(basename $(SRCLIST_COMPILE_AND_RUN_OK)))
-APPLIST_COMPILE_AND_RUN_OK := $(addsuffix $(EXEEXT),$(basename $(SRCLIST_COMPILE_AND_RUN_OK)))
+APPLIST_COMPILE_AND_RUN_OK := $(addsuffix $(TARGET_EXEEXT),$(basename $(SRCLIST_COMPILE_AND_RUN_OK)))
 LOGLIST_COMPILE_AND_RUN_OK := $(addsuffix .log,$(basename $(SRCLIST_COMPILE_AND_RUN_OK)))
 
 # COMPILE_AND_RUN_FAIL
 SRCLIST_COMPILE_AND_RUN_FAIL := $(filter %.bas,$(patsubst %.bmk,%.bas,$(SRCLIST_COMPILE_AND_RUN_FAIL)))
 OBJLIST_COMPILE_AND_RUN_FAIL := $(addsuffix .o,$(basename $(SRCLIST_COMPILE_AND_RUN_FAIL)))
-APPLIST_COMPILE_AND_RUN_FAIL := $(addsuffix $(EXEEXT),$(basename $(SRCLIST_COMPILE_AND_RUN_FAIL)))
+APPLIST_COMPILE_AND_RUN_FAIL := $(addsuffix $(TARGET_EXEEXT),$(basename $(SRCLIST_COMPILE_AND_RUN_FAIL)))
 LOGLIST_COMPILE_AND_RUN_FAIL := $(addsuffix .log,$(basename $(SRCLIST_COMPILE_AND_RUN_FAIL)))
 
 # MULI_MODULE_OK
@@ -141,6 +148,12 @@ $(LOGLIST_MULTI_MODULE_OK) \
 $(LOGLIST_MULTI_MODULE_FAIL) \
 )
 
+OBJLIST_ALL := $(strip \
+$(OBJLIST_COMPILE_ONLY_OK) \
+$(OBJLIST_COMPILE_ONLY_FAIL) \
+$(OBJLIST_COMPILE_AND_RUN_OK) \
+$(OBJLIST_COMPILE_AND_RUN_FAIL) \
+) 
 
 # set ABORT_CMD := false to abort on failed tests, true to continue anyway
 ABORT_CMD := true
@@ -155,6 +168,13 @@ endif
 
 ifneq ($(FB_LANG),)
 FBC_CFLAGS += -lang $(FB_LANG)
+endif
+
+ifeq ($(ENABLE_CHECK_BUGS),1)
+	FBC_CFLAGS += -d ENABLE_CHECK_BUGS=$(ENABLE_CHECK_BUGS)
+endif
+ifeq ($(ENABLE_CONSOLE_OUTPUT),1)
+	FBC_CFLAGS += -d ENABLE_CONSOLE_OUTPUT=$(ENABLE_CONSOLE_OUTPUT)
 endif
 
 # ------------------------------------------------------------------------
@@ -327,20 +347,34 @@ $(LOG_TESTS_INC) :
 >> $(LOG_TESTS_INC)
 	@$(ECHO) "#" >> $(LOG_TESTS_INC)
 
+# hack: use the auto-generated list of tests to create a temporary file
+# containing a list of all the .o & .log files.  The command line can be
+# very long and some shells (like cmd.exe) won't handle it.
+
 	@$(PRINTF) "."
-	@$(FIND) $(DIRLIST) -type f -name '*.bas' -or -name '*.bmk' \
-| $(XARGS) $(GREP) -l -i -E '#[[:space:]]*include[[:space:]](once)*[[:space:]]*\"fbcu\.bi\"' \
-| $(SED) -e 's/\(^.*\)/\SRCLIST_CUNIT \+\= \.\/\1/g' \
->> $(LOG_TESTS_INC)
-	@$(ECHO) "#" >> $(LOG_TESTS_INC)
+	@$(GREP) $(LOG_TESTS_INC) -i -e ".*+=.*\.b.*" \
+| $(SED) 's/^.* += \(.*\)\(\.b.*\)/\1\.o/g' \
+> $(LOG_TESTS_OBJ_LST)
+
+$(LOG_TESTS_LOG_LST) : $(LOG_TESTS_INC)
+	@$(PRINTF) "."
+	@$(GREP) $(LOG_TESTS_INC) -i -e "^.*+=.*\.b.*" \
+| $(SED) 's/^.* += \(.*\)\(\.b.*\)/\1\.log/g' \
+> $(LOG_TESTS_LOG_LST)
 
 	@$(ECHO) " Done"
 
 # ------------------------------------------------------------------------
 # results
 #
+# use xargs to manage the number of maximum number of arguments passed to grep and store the
+# results in a single file
+#
+#
+$(LOG_TESTS_RESULTS_LOG): $(LOG_TESTS_LOG_LST) $(LOGLIST_ALL)
+	@$(XARGS) -a $(LOG_TESTS_LOG_LST) $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' ; true > $@ 
 
-results : $(LOGLIST_ALL)
+results : $(LOG_TESTS_RESULTS_LOG)
 
 	@$(PRINTF) "\n\nFAILED LOG - for log-tests -lang $(FB_LANG)\n" > $(FAILED_LOG)
 
@@ -348,7 +382,7 @@ ifeq ($(LOGLIST_ALL),)
 	@$(PRINTF) "None Found\n\n" >> $(FAILED_LOG)
 else
 	@if  \
-$(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' $(LOGLIST_ALL) \
+$(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' $(LOG_TESTS_RESULTS_LOG) \
 	; then \
 		$(PRINTF) " \n" && \
 		true \
@@ -371,53 +405,29 @@ mostlyclean : clean_tests
 .PHONY: clean_tests
 clean_tests :
 	@$(ECHO) Cleaning log-tests for -lang $(FB_LANG) ...
-ifneq ($(OBJLIST_COMPILE_ONLY_OK),)
-	@$(RM) $(OBJLIST_COMPILE_ONLY_OK) 
+	$(RM) $(LOG_TESTS_RESULTS_LOG)
+ifneq ($(LOGLIST_ALL),)
+	@if [ -f $(LOG_TESTS_LOG_LST) ]; then $(XARGS) -r -a $(LOG_TESTS_LOG_LST) $(RM) ; fi
+	@if [ -f $(LOG_TESTS_OBJ_LST) ]; then $(XARGS) -r -a $(LOG_TESTS_OBJ_LST) $(RM) ; fi
 endif
-ifneq ($(LOGLIST_COMPILE_ONLY_OK),)
-	@$(RM) $(LOGLIST_COMPILE_ONLY_OK)
-endif
-ifneq ($(OBJLIST_COMPILE_ONLY_FAIL),)
-	@$(RM) $(OBJLIST_COMPILE_ONLY_FAIL) 
-endif
-ifneq ($(LOGLIST_COMPILE_ONLY_FAIL),)
-	@$(RM) $(LOGLIST_COMPILE_ONLY_FAIL)
-endif
+
 ifneq ($(APPLIST_COMPILE_AND_RUN_OK),)
 	@$(RM) $(APPLIST_COMPILE_AND_RUN_OK) 
-endif
-ifneq ($(OBJLIST_COMPILE_AND_RUN_OK),)
-	@$(RM) $(OBJLIST_COMPILE_AND_RUN_OK) 
-endif
-ifneq ($(LOGLIST_COMPILE_AND_RUN_OK),)
-	@$(RM) $(LOGLIST_COMPILE_AND_RUN_OK)
-endif
-ifneq ($(OBJLIST_COMPILE_AND_RUN_FAIL),)
-	@$(RM) $(OBJLIST_COMPILE_AND_RUN_FAIL) 
 endif
 ifneq ($(APPLIST_COMPILE_AND_RUN_FAIL),)
 	@$(RM) $(APPLIST_COMPILE_AND_RUN_FAIL) 
 endif
-ifneq ($(LOGLIST_COMPILE_AND_RUN_FAIL),)
-	@$(RM) $(LOGLIST_COMPILE_AND_RUN_FAIL)
-endif
 ifneq ($(SRCLIST_MULTI_MODULE_OK),)
 	@for s in $(SRCLIST_MULTI_MODULE_OK) ; do $(MAKE) -f bmk-make.mk clean BMK=$$s TEST_MODE=MULTI_MODULE_OK ; done
-endif
-ifneq ($(LOGLIST_MULTI_MODULE_OK),)
-	@$(RM) $(LOGLIST_MULTI_MODULE_OK) 
 endif
 ifneq ($(SRCLIST_MULTI_MODULE_FAIL),)
 	@for s in $(SRCLIST_MULTI_MODULE_FAIL) ; do $(MAKE) -f bmk-make.mk clean BMK=$$s TEST_MODE=MULTI_MODULE_FAIL ; done
 endif
-ifneq ($(LOGLIST_MULTI_MODULE_FAIL),)
-	@$(RM) $(LOGLIST_MULTI_MODULE_FAIL) 
-endif
 
 .PHONY: clean_include
 clean_include :
-	$(RM) $(LOG_TESTS_INC)
-	@$(RM) $(FAILED_LOG) 
+	$(RM) $(LOG_TESTS_INC) $(LOG_TESTS_LOG_LST) $(LOG_TESTS_OBJ_LST)
+	@$(RM) $(FAILED_LOG)
 
 .PHONY: clean_failed_include
 clean_failed_include :

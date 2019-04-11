@@ -5,7 +5,7 @@
 # and testing run-time assertions
 #
 # expected usage
-# make -f bmk-make.mk [clean] { BMK=? | FILE=? } TEST_MODE=? [ALLOW_CUNIT=0|1]
+# make -f bmk-make.mk [clean] { BMK=? | FILE=? } TEST_MODE=?
 #   clean
 #       clean files
 #   BMK=/path/filename.bmk
@@ -63,6 +63,11 @@ FBC_CFLAGS += -arch $(ARCH)
 FBC_LFLAGS += -arch $(ARCH)
 endif
 
+ifneq ($(TARGET),)
+FBC_CFLAGS += -target $(TARGET)
+FBC_LFLAGS += -target $(TARGET)
+endif
+
 ifneq ($(FPU),)
 FBC_CFLAGS += -fpu $(FPU)
 endif
@@ -77,6 +82,13 @@ ifeq ($(TARGET_ARCH),x86)
 endif
 ifeq ($(TARGET_ARCH),x86_64)
 	CFLAGS := -m64
+endif
+
+ifeq ($(ENABLE_CHECK_BUGS),1)
+	FBC_CFLAGS += -d ENABLE_CHECK_BUGS=$(ENABLE_CHECK_BUGS)
+endif
+ifeq ($(ENABLE_CONSOLE_OUTPUT),1)
+	FBC_CFLAGS += -d ENABLE_CONSOLE_OUTPUT=$(ENABLE_CONSOLE_OUTPUT)
 endif
 
 # The default target has to appear before "include $(BMK)", which might
@@ -104,7 +116,7 @@ SRCSX := $(FILE)
 endif
 
 MAIN_MODULE := $(basename $(MAINX))
-APP := $(MAIN_MODULE)$(EXEEXT)
+APP := $(MAIN_MODULE)$(TARGET_EXEEXT)
 
 ifeq ($(MAIN_MODULE),)
 $(error main module not specified)
@@ -112,10 +124,6 @@ endif
 
 FBC_CFLAGS += -g -w 0 
 FBC_LFLAGS += -g
-
-ifeq ($(ALLOW_CUNIT),1)
-FBC_CFLAGS += -i fbcu/fake
-endif
 
 OBJS := $(addsuffix .o,$(basename $(SRCSX)))
 

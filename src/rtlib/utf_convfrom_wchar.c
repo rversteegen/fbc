@@ -37,12 +37,15 @@ static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 		case 4:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
+			/* fall through */
 		case 3:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
+			/* fall through */
 		case 2:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
+			/* fall through */
 		case 1:
 			*--dst = (c | __fb_utf8_bmarkTb[bytes]);
 		}
@@ -78,12 +81,15 @@ static void hUTF32ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 		case 4:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
+			/* fall through */
 		case 3:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
+			/* fall through */
 		case 2:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
+			/* fall through */
 		case 1:
 			*--dst = (c | __fb_utf8_bmarkTb[bytes]);
 		}
@@ -154,6 +160,7 @@ static UTF_16 *hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, s
 
 			*bytes += sizeof( UTF_16 );
 
+			c -= UTF16_HALFBASE;
 			dst[i++] = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
 			c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 		}

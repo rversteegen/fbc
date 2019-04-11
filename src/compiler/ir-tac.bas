@@ -106,7 +106,8 @@ declare sub hFlushDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval ex as integer, _
+		ByVal filename As zstring ptr _
 	)
 
 declare sub hFlushLIT( byval op as integer, byval text as zstring ptr )
@@ -294,7 +295,8 @@ private sub _emit _
 		byval v2 as IRVREG ptr, _
 		byval vr as IRVREG ptr, _
 		byval ex1 as FBSYMBOL ptr = NULL, _
-		byval ex2 as integer = 0 _
+		byval ex2 as integer = 0, _
+		byval ex3 as zstring ptr = 0 _
 	) static
 
     dim as IRTAC ptr t
@@ -317,7 +319,8 @@ private sub _emit _
 
     t->ex1 = ex1
     t->ex2 = ex2
-
+    t->ex3 = ex3
+   
     ctx.taccnt += 1
 
 end sub
@@ -648,12 +651,12 @@ private sub _emitJmpTb _
 		byval labels as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 	_flush( )
-	emitJMPTB( tbsym, values, labels, labelcount, deflabel, minval, maxval )
+	emitJMPTB( tbsym, values, labels, labelcount, deflabel, bias, span )
 
 end sub
 
@@ -670,6 +673,17 @@ private sub _emitMem _
 
 end sub
 
+'':::::
+private sub _emitMacro _
+	( _
+		byval op as integer, _
+		byval v1 as IRVREG ptr, _
+		byval v2 as IRVREG ptr, _
+		byval vr as IRVREG ptr _
+	)
+	'' Used by C-emitter only
+end sub
+
 private sub _emitDECL( byval sym as FBSYMBOL ptr )
 	'' Nothing to do - used by C backend
 end sub
@@ -679,10 +693,11 @@ private sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval ex as integer, _
+		byval filename as zstring ptr _
 	)
 
-	_emit( op, NULL, NULL, NULL, proc, ex )
+	_emit( op, NULL, NULL, NULL, proc, ex, filename )
 
 end sub
 
@@ -725,11 +740,17 @@ private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
 end sub
 
 private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
-	emitVARINIi( symbGetType( sym ), value )
+	dim realtype as integer
+	dim realsubtype as FBSYMBOL ptr
+	symbGetRealType( sym, realtype, realsubtype )
+	emitVARINIi( realtype, value )
 end sub
 
 private sub _emitVarIniF( byval sym as FBSYMBOL ptr, byval value as double )
-	emitVARINIf( symbGetType( sym ), value )
+	dim realtype as integer
+	dim realsubtype as FBSYMBOL ptr
+	symbGetRealType( sym, realtype, realsubtype )
+	emitVARINIf( realtype, value )
 end sub
 
 private sub _emitVarIniOfs _
@@ -880,6 +901,10 @@ private function _allocVreg _
 
 	dim as IRVREG ptr vr = any
 
+	'' ir-tac can't handle any extra bits in the DTYPE
+	'' other than PTR level and FB_DATATYPE
+	dtype = typeGetDtAndPtrOnly( dtype )
+
 	vr = hNewVR( dtype, subtype, IR_VREGTYPE_REG )
 
 	'' longint?
@@ -899,6 +924,8 @@ private function _allocVrImm _
 	) as IRVREG ptr
 
 	dim as IRVREG ptr vr = any
+
+	dtype = typeGetDtAndPtrOnly( dtype )
 
 	vr = hNewVR( dtype, subtype, IR_VREGTYPE_IMM )
 
@@ -927,6 +954,8 @@ private function _allocVrImmF _
 	dim as IRVREG ptr vr = any
 	dim as FBSYMBOL ptr s = any
 
+	dtype = typeGetDtAndPtrOnly( dtype )
+
 	'' float immediates supported by the FPU?
 	if( irGetOption( IR_OPT_FPUIMMEDIATES ) ) then
 		vr = hNewVR( dtype, subtype, IR_VREGTYPE_IMM )
@@ -952,6 +981,8 @@ private function _allocVrVar _
 	dim as IRVREG ptr vr = any, va = any
 
 	assert( symbol )
+
+	dtype = typeGetDtAndPtrOnly( dtype )
 
 	vr = hNewVR( dtype, subtype, IR_VREGTYPE_VAR )
 
@@ -982,6 +1013,8 @@ private function _allocVrIdx _
 
 	dim as IRVREG ptr vr = any, va = any
 
+	dtype = typeGetDtAndPtrOnly( dtype )
+
 	vr = hNewVR( dtype, subtype, IR_VREGTYPE_IDX )
 
 	vr->sym = symbol
@@ -1011,6 +1044,8 @@ private function _allocVrPtr _
 
 	dim as IRVREG ptr vr = any, va = any
 
+	dtype = typeGetDtAndPtrOnly( dtype )
+
 	vr = hNewVR( dtype, subtype, IR_VREGTYPE_PTR )
 
 	vr->ofs = ofs
@@ -1039,6 +1074,8 @@ private function _allocVrOfs _
 
 	dim as IRVREG ptr vr = any
 
+	dtype = typeGetDtAndPtrOnly( dtype )
+
 	vr = hNewVR( dtype, subtype, IR_VREGTYPE_OFS )
 
 	vr->sym = symbol
@@ -1055,6 +1092,8 @@ private sub _setVregDataType _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr _
 	)
+
+	dtype = typeGetDtAndPtrOnly( dtype )
 
 	if( vreg <> NULL ) then
 		vreg->dtype = typeGet( dtype )
@@ -1121,7 +1160,7 @@ private sub hDump _
 			else
 				s += " "
 			end if
-			s += id + " = " + vregDump( v )
+			s += id + " = " + vregDumpToStr( v )
 			if( wrapline ) then
 				s += NEWLINE
 			else
@@ -1151,8 +1190,8 @@ function tacvregDump( byval tacvreg as IRTACVREG ptr ) as string
 		return "<NULL>"
 	end if
 	function = "IRTACVREG( " & _
-		"vreg=" & vregDump( tacvreg->vreg ) & ", " & _
-		"parent=" & vregDump( tacvreg->parent ) & ", " & _
+		"vreg=" & vregDumpToStr( tacvreg->vreg ) & ", " & _
+		"parent=" & vregDumpToStr( tacvreg->parent ) & ", " & _
 		"next=" & tacvregDump( tacvreg->next ) & " )"
 end function
 
@@ -1355,7 +1394,7 @@ private sub _flush static
 			hFlushMEM( op, v1, v2, t->ex2, t->ex1 )
 
 		case AST_NODECLASS_DBG
-			hFlushDBG( op, t->ex1, t->ex2 )
+			hFlushDBG( op, t->ex1, t->ex2, t->ex3 )
 
 		case AST_NODECLASS_LIT
 			hFlushLIT( op, cast( any ptr, t->ex1 ) )
@@ -2013,6 +2052,8 @@ private sub hFlushCOMP _
 		doload = TRUE
 	elseif( v1_typ = IR_VREGTYPE_IMM) then          '' /
 		doload = TRUE
+	elseif( v1_typ = IR_VREGTYPE_OFS and v2_typ = IR_VREGTYPE_IMM ) then
+		doload = TRUE
 	elseif( v2_typ <> IR_VREGTYPE_REG ) then        '' /
 		if( v2_typ <> IR_VREGTYPE_IMM ) then
 			doload = TRUE
@@ -2389,12 +2430,13 @@ private sub hFlushDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval ex as integer, _
+		ByVal filename As zstring ptr _
 	)
 
 	select case as const op
 	case AST_OP_DBG_LINEINI
-		emitDBGLineBegin( proc, ex )
+		emitDBGLineBegin( proc, ex, filename )
 
 	case AST_OP_DBG_LINEEND
 		emitDBGLineEnd( proc, ex )
@@ -2679,6 +2721,7 @@ dim shared as IR_VTBL irtac_vtbl = _
 	@_emitBranch, _
 	@_emitJmpTb, _
 	@_emitMem, _
+	@_emitMacro, _
 	@_emitScopeBegin, _
 	@_emitScopeEnd, _
 	@_emitDECL, _

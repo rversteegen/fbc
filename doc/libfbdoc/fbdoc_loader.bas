@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2008 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -69,7 +69,7 @@ namespace fb.fbdoc
 				if( wikicache->LoadPage( sPage, sBody ) ) = FALSE then
 					if RefreshMode = CWikiCache.CACHE_REFRESH_NONE then
 						return ""
-					elseif( bNoReload = TRUE ) then
+					elseif( bNoReload ) then
 						return ""
 					end if
 					bLoadPage = TRUE
@@ -77,7 +77,7 @@ namespace fb.fbdoc
 			end select
 		end if
 
-		if bLoadPage = TRUE then
+		if( bLoadPage ) then
 			dim as CWikiCon ptr wikicon = Connection_Create( )
 			printlog "Loading '" + *sPage + "'"
 			if( wikicon->LoadPage( sPage, TRUE, TRUE, sBody ) <> FALSE ) then

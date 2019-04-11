@@ -185,7 +185,8 @@ declare sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr = 0 _
 	)
 declare function hVregToStr( byval vreg as IRVREG ptr ) as string
 declare sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
@@ -234,7 +235,14 @@ dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 private sub _init( )
 	irhlInit( )
 
-	irSetOption( IR_OPT_CPUSELFBOPS or IR_OPT_FPUIMMEDIATES or IR_OPT_MISSINGOPS )
+	irSetOption( IR_OPT_FPUIMMEDIATES or IR_OPT_MISSINGOPS )
+
+	'' IR_OPT_CPUSELFBOPS disabled, to prevent AST from producing self-ops.
+	'' LLVM does not have self ops, and implementing them manually here would be
+	'' unnecessarily complex, especially in cases like:
+	''    a = noconvcast(a) op b   (self-bop with type-casted destination vreg)
+	'' because _setVregDataType() generates code to represent the cast, and the
+	'' resulting REG can't be used as store destination.
 
 	if( fbIs64bit( ) ) then
 		dtypeName(FB_DATATYPE_INTEGER) = dtypeName(FB_DATATYPE_LONGINT)
@@ -327,7 +335,7 @@ private function vregPretty( byval v as IRVREG ptr ) as string
 		s += "*" & v->mult
 	end if
 
-	's += " " + typeDump( v->dtype, v->subtype )
+	's += " " + typeDumpToStr( v->dtype, v->subtype )
 
 	function = s
 end function
@@ -885,7 +893,7 @@ private function _emitBegin( ) as integer
 		builtins(i).used = FALSE
 	next
 
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		_emitDBG( AST_OP_DBG_LINEINI, NULL, 0 )
 	end if
 
@@ -992,8 +1000,6 @@ end sub
 
 private sub _procAllocArg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr )
 	dim as string ln
-	dim as integer parammode = any
-	dim as FBSYMBOL ptr bydescrealsubtype = any
 
 	hAstCommand( "paramvar " + hSymName( sym ) )
 
@@ -1007,20 +1013,9 @@ private sub _procAllocArg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 	'' they must use different names to avoid collision.
 	''
 
-	bydescrealsubtype = NULL
-	if( symbIsParamByref( sym ) ) then
-		parammode = FB_PARAMMODE_BYREF
-	elseif( symbIsParamBydesc( sym ) ) then
-		parammode = FB_PARAMMODE_BYDESC
-		bydescrealsubtype = sym->var_.array.desctype
-	else
-		assert( symbIsParamByval( sym ) )
-		parammode = FB_PARAMMODE_BYVAL
-	end if
-
-	var dtype = symbGetType( sym )
-	var subtype = sym->subtype
-	symbGetRealParamDtype( parammode, bydescrealsubtype, dtype, subtype )
+	dim dtype as integer
+	dim subtype as FBSYMBOL ptr
+	symbGetRealType( sym, dtype, subtype )
 
 	'' %myparam = alloca type
 	ln = *symbGetMangledName( sym ) + " = alloca "
@@ -1138,8 +1133,10 @@ private sub hPrepareAddress( byval v as IRVREG ptr )
 		v->vidx = NULL
 
 		if( sym ) then
-			v->dtype = typeAddrOf( sym->typ )
-			v->subtype = sym->subtype
+			symbGetRealType( sym, v->dtype, v->subtype )
+
+			'' vreg is the address of the memory allocated for the sym
+			v->dtype = typeAddrOf( v->dtype )
 
 			'' May need to cast from symbol's type to vreg's type (e.g. for field accesses)
 			_setVregDataType( v, addrdtype, addrsubtype )
@@ -1539,7 +1536,7 @@ private sub _emitBop _
 		byval label as FBSYMBOL ptr _
 	)
 
-	var bopdump = vregPretty( v1 ) + " " + astDumpOp( op ) + " " + vregPretty( v2 )
+	var bopdump = vregPretty( v1 ) + " " + astDumpOpToStr( op ) + " " + vregPretty( v2 )
 	if( label ) then
 		hAstCommand( "branchbop " + bopdump )
 	elseif( vr = NULL ) then
@@ -1606,7 +1603,7 @@ private sub _emitUop _
 		byval vr as IRVREG ptr _
 	)
 
-	var uopdump = astDumpOp( op ) + " " + vregPretty( v1 )
+	var uopdump = astDumpOpToStr( op ) + " " + vregPretty( v1 )
 	if( vr = NULL ) then
 		hAstCommand( "selfuop " + uopdump )
 	else
@@ -1997,8 +1994,8 @@ private sub _emitJmpTb _
 		byval labels as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 	hAstCommand( "jmptb " + vregPretty( v1 ) )
@@ -2017,7 +2014,7 @@ private sub _emitJmpTb _
 
 	ctx.indent += 1
 	for i as integer = 0 to labelcount - 1
-		ln = dtype + " " & values[i] & ", "
+		ln = dtype + " " & (values[i]+bias) & ", "
 		ln += "label %" + *symbGetMangledName( labels[i] )
 		hWriteLine( ln )
 	next
@@ -2077,6 +2074,16 @@ private sub _emitMem _
 	hWriteLine( ln )
 end sub
 
+private sub _emitMacro _
+	( _
+		byval op as integer, _
+		byval v1 as IRVREG ptr, _
+		byval v2 as IRVREG ptr, _
+		byval vr as IRVREG ptr _
+	)
+	'' Used by C-emitter only
+end sub
+
 private sub _emitDECL( byval sym as FBSYMBOL ptr )
 end sub
 
@@ -2084,13 +2091,18 @@ private sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr _
 	)
 
-	if( op = AST_OP_DBG_LINEINI ) then
-		hWriteLine( "#line " & ex & " """ & hReplace( env.inf.name, "\", $"\\" ) & """" )
-		ctx.linenum = ex
-	end if
+	if( op = AST_OP_DBG_LINEINI ) Then
+		if( filename <> NULL ) then
+			hWriteLine( "#line " & lnum & " """ & hReplace( filename, "\", $"\\" ) & """" )
+		else
+			hWriteLine( "#line " & lnum & " """ & hReplace( env.inf.name, "\", $"\\" ) & """" )
+		end if
+		ctx.linenum = lnum
+	end If
 
 end sub
 
@@ -2166,11 +2178,18 @@ end sub
 private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 	hVarIniElementType( sym )
 	var dtype = symbGetType( sym )
+
+	'' AST stores boolean true as -1, but we emit it as 1 for gcc compatibility
+	if( (dtype = FB_DATATYPE_BOOLEAN) and (value <> 0) ) then
+		value = 1
+	end if
+
 	if( typeGetSize( dtype ) = 8 ) then
 		ctx.varini += hEmitLong( value )
 	else
 		ctx.varini += hEmitInt( dtype, sym->subtype, value )
 	end if
+
 	hVarIniSeparator( )
 end sub
 
@@ -2461,6 +2480,7 @@ static as IR_VTBL irllvm_vtbl = _
 	@_emitBranch, _
 	@_emitJmpTb, _
 	@_emitMem, _
+	@_emitMacro, _
 	@_emitScopeBegin, _
 	@_emitScopeEnd, _
 	@_emitDECL, _

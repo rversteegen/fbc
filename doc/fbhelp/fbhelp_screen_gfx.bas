@@ -1,5 +1,5 @@
 ''  fbhelp - FreeBASIC help viewer
-''  Copyright (C) 2006-2008 Jeffery R. Marshall (coder[at]execulink.com)
+''  Copyright (C) 2006-2018 Jeffery R. Marshall (coder[at]execulink.com)
 
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -165,7 +165,7 @@ public sub Screen_DrawTextAttrib _
 		line (xx,yy)-(xx+7,yy+7),text[i].attrib shr 4, bf
 		Draw String (xx,yy), chr(text[i].char), text[i].attrib and 15
 		xx += 8
-	next xx
+	next i
 	
 	if( cursor_drawn ) then
 		if( cursor_x >= x ) then
@@ -223,7 +223,7 @@ end sub
 
 '':::::
 public sub Screen_HideCursor ( )
-	if( cursor_visible = TRUE ) then
+	if( cursor_visible ) then
 		cursor_visible = FALSE
 	end if
 end sub

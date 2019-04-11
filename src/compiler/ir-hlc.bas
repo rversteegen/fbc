@@ -144,6 +144,7 @@ enum
 	EXPRCLASS_CAST
 	EXPRCLASS_UOP
 	EXPRCLASS_BOP
+	EXPRCLASS_MACRO
 end enum
 
 type EXPRNODE
@@ -223,7 +224,8 @@ declare sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr = 0 _
 	)
 
 declare sub exprFreeNode( byval n as EXPRNODE ptr )
@@ -256,6 +258,7 @@ dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 	@"double"   , _ '' double
 	@"FBSTRING" , _ '' string
 	NULL        , _ '' fix-len string
+	@"__builtin_va_list"  , _ '' va_list
 	NULL        , _ '' struct
 	NULL        , _ '' namespace
 	NULL        , _ '' function
@@ -384,7 +387,7 @@ end sub
 private sub hWriteLine( byref s as string, byval noline as integer = FALSE )
 	static as string ln
 
-	if( env.clopt.debug and (noline = FALSE) ) then
+	if( env.clopt.debuginfo and (noline = FALSE) ) then
 		ln = "#line " + str( ctx.linenum )
 		ln += " """ + ctx.escapedinputfilename + """"
 		sectionWriteLine( ln )
@@ -504,11 +507,13 @@ private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 		function = TRUE
 
 	'' For stdcall with @N suffix, if the function has a hidden UDT result
-	'' pointer parameter, we need the alias to get the correct @N suffix.
-	'' (gcc would calculate the parameter into the @N suffix, since it
-	'' doesn't know that the parameter is the special result parameter)
+	'' pointer parameter, or UDT's passed byval, we need the alias to get
+	'' the correct @N suffix. (gcc could calculate the wrong value into the
+	'' @N suffix, since it doesn't known about the special result parameter
+	'' or byval UDTs).  It should be safe to always generate the alias
+	'' ourselves since we already must control for the special cases.
 	case FB_FUNCMODE_STDCALL
-		function = symbProcReturnsOnStack( proc )
+		function = TRUE
 	end select
 end function
 
@@ -534,7 +539,7 @@ private function hEmitProcHeader _
 	end if
 
 	'' Function result type (is 'void' for subs)
-	ln += hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
+	ln += hEmitType( symbGetProcRealType( proc ), _
 					symbGetProcRealSubtype( proc ) )
 
 	'' Calling convention if needed (for function pointers it's usually not
@@ -644,6 +649,14 @@ private function hGetUdtTag( byval sym as FBSYMBOL ptr ) as string
 end function
 
 private function hGetUdtId( byval sym as FBSYMBOL ptr ) as string
+
+	'' gcc's __builtin_va_list needs an exact name
+	select case symbGetValistType( symbGetFullType( sym ), symbGetSubtype( sym ) )
+	case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_AARCH64
+			function = *sym->id.alias
+			exit function
+	end select
+
 	'' Prefixing the mangled name with a $ because it may start with a
 	'' number which isn't allowed in C.
 	function = "$" + *symbGetMangledName( sym )
@@ -674,6 +687,11 @@ private sub hEmitUDT( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 		'' see main's locals from elsewhere)
 		if( symbGetScope( s ) = FB_MAINSCOPE ) then
 			section += 1
+
+		'' global namespace due the implicit MAIN?
+		elseif( symbGetNamespace( s ) = @symbGetGlobalNamespc( ) ) then
+			section += 1
+
 		end if
 
 		'' Switching from a parent to a child scope isn't allowed,
@@ -784,10 +802,9 @@ private sub hEmitVarDecl _
 		ln += "static "
 	end if
 
-	var dtype = symbGetType( sym )
-	if( symbIsRef( sym ) or symbIsImport( sym ) ) then
-		dtype = typeAddrOf( dtype )
-	end if
+	dim dtype as integer
+	dim subtype as FBSYMBOL ptr
+	symbGetRealType( sym, dtype, subtype )
 
 	ln += hEmitType( dtype, sym->subtype )
 	ln += " " + *symbGetMangledName( sym )
@@ -1031,6 +1048,23 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 					ln += " __attribute__((packed, aligned(" + str( align ) + ")))"
 				end if
 			end if
+			
+			'' The alignment of nested structures which are packed with a 
+			'' smaller alignment than the natural or specified alignment of the
+			'' parent structure has to be specified explicitly,
+			'' otherwise the field will be packed too.
+			if ( align <= 0 orelse skip ) then
+				if( typeGet( dtype ) = FB_DATATYPE_STRUCT ) then
+					var effectivealign = typeCalcNaturalAlign( dtype, subtype )
+					if ( align > 0 andalso align < effectivealign ) then
+						effectivealign = align
+					end if
+					var fieldudtalign = symbGetUDTAlign( subtype )
+					if( fieldudtalign > 0 andalso effectivealign > fieldudtalign ) then
+						ln += " __attribute__((aligned(" + str( effectivealign ) + ")))"
+					end if
+				end if
+			end if
 
 			ln += ";"
 			hWriteLine( ln, TRUE )
@@ -1253,7 +1287,7 @@ private function _emitBegin( ) as integer
 	'' header
 	sectionBegin( )
 
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		_emitDBG( AST_OP_DBG_LINEINI, NULL, 0 )
 	end if
 
@@ -1498,6 +1532,16 @@ private function hEmitType _
 	dim as string s
 	dim as integer ptrcount = any
 
+	'' replace type with __builtin_va_list if
+	'' the mangle modifier was given
+	if( symbIsBuiltinVaListType( dtype, subtype ) ) then
+		select case symbGetValistType( dtype, subtype )
+		case FB_CVA_LIST_BUILTIN_POINTER
+			dtype = typeJoinDtOnly( typeDeref(dtype), FB_DATATYPE_VA_LIST )
+		case else
+			dtype = typeJoinDtOnly( dtype, FB_DATATYPE_VA_LIST )
+		end select
+	end if
 	ptrcount = typeGetPtrCnt( dtype )
 	dtype = typeGetDtOnly( dtype )
 
@@ -1688,6 +1732,22 @@ private function exprNewCAST _
 	function = n
 end function
 
+private function exprNewMACRO _
+	( _
+		byval op as AST_OP, _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr, _
+		byval l as EXPRNODE ptr, _
+		byval r as EXPRNODE ptr _
+	) as EXPRNODE ptr
+
+	var n = exprNew( EXPRCLASS_MACRO, dtype, subtype )
+	n->op = op
+	n->l = l
+	n->r = r
+	function = n
+end function
+
 private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 	dim as EXPRNODE ptr n = any
 	dim as integer dtype = any
@@ -1715,12 +1775,6 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 		n = exprNew( EXPRCLASS_SYM, typeAddrOf( FB_DATATYPE_FUNCTION ), sym )
 		n->sym = sym
 
-	'' Bydesc dynamic array param? Use descriptor type
-	elseif( symbIsParamBydesc( sym ) ) then
-		assert( sym->var_.array.desctype )
-		n = exprNew( EXPRCLASS_SYM, typeAddrOf( FB_DATATYPE_STRUCT ), sym->var_.array.desctype )
-		n->sym = sym
-
 	'' Array? Add CAST to make it a pointer to the first element,
 	'' instead of a pointer to the array.
 	elseif( symbIsCArray( sym ) ) then
@@ -1736,14 +1790,9 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 	        ((sym->stats and FB_SYMBSTATS_ARGV) <> 0) ) then
 		n = exprNew( EXPRCLASS_SYM, typeMultAddrOf( FB_DATATYPE_BYTE, 2 ), NULL )
 		n->sym = sym
-	else
-		dtype = symbGetType( sym )
-		subtype = symbGetSubtype( sym )
 
-		'' Emitted as pointer?
-		if( symbIsRef( sym ) or symbIsParamByRef( sym ) or symbIsImport( sym ) ) then
-			dtype = typeAddrOf( dtype )
-		end if
+	else
+		symbGetRealType( sym, dtype, subtype )
 
 		n = exprNew( EXPRCLASS_SYM, dtype, subtype )
 		n->sym = sym
@@ -2279,6 +2328,43 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		ctx.exprtext += "(" + hEmitType( n->dtype, n->subtype ) + ")"
 		hExprFlush( n->l, TRUE )
 
+	case EXPRCLASS_MACRO
+		select case( n->op )
+		case AST_OP_VA_ARG
+			'' cva_arg(l, type) := __builtin_va_arg(l, type)
+			ctx.exprtext += "__builtin_va_arg( "
+			hExprFlush( n->l, TRUE )
+			ctx.exprtext += ", "
+			ctx.exprtext += hEmitType( n->dtype, n->subtype )
+			ctx.exprtext += ")"
+
+		case AST_OP_VA_START
+			'' cva_start(l, r) := __builtin_va_start(l, r)
+			ctx.exprtext += "__builtin_va_start( "
+			hExprFlush( n->l, TRUE )
+			ctx.exprtext += ", "
+			hExprFlush( n->r, TRUE )
+			ctx.exprtext += ")"
+			
+		case AST_OP_VA_END
+			'' cva_end(l) := __builtin_va_end(l)
+			ctx.exprtext += "__builtin_va_end( "
+			hExprFlush( n->l, TRUE )
+			ctx.exprtext += ")"
+
+		case AST_OP_VA_COPY
+			'' cva_copy(l, r) := __builtin_va_copy(l, r)
+			ctx.exprtext += "__builtin_va_copy( "
+			hExprFlush( n->l, TRUE )
+			ctx.exprtext += ", "
+			hExprFlush( n->r, TRUE )
+			ctx.exprtext += ")"
+
+		case else
+			assert( FALSE )
+		end select
+
+
 	case EXPRCLASS_UOP
 		ctx.exprtext += *hUopToStr( n->op, n->dtype, is_builtin )
 
@@ -2361,11 +2447,12 @@ private sub exprDump( byval n as EXPRNODE ptr )
 		@"SYM" , _ '' EXPRCLASS_SYM
 		@"CAST", _ '' EXPRCLASS_CAST
 		@"UOP" , _ '' EXPRCLASS_UOP
-		@"BOP"   _ '' EXPRCLASS_BOP
+		@"BOP" , _ '' EXPRCLASS_BOP
+		@"MACRO" _ '' EXPRCLASS_MACRO
 	}
 
 	s += *names(n->class)
-	s += typeDump( n->dtype, n->subtype )
+	s += typeDumpToStr( n->dtype, n->subtype )
 	s += " "
 
 	select case as const( n->class )
@@ -2379,6 +2466,9 @@ private sub exprDump( byval n as EXPRNODE ptr )
 		hSym2Text( s, n->sym )
 
 	case EXPRCLASS_CAST
+		s += hEmitType( n->dtype, n->subtype )
+
+	case EXPRCLASS_MACRO
 		s += hEmitType( n->dtype, n->subtype )
 
 	case EXPRCLASS_UOP
@@ -2404,6 +2494,9 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	case EXPRCLASS_CAST, EXPRCLASS_UOP
 		exprDump( n->l )
 	case EXPRCLASS_BOP
+		exprDump( n->l )
+		exprDump( n->r )
+	case EXPRCLASS_MACRO
 		exprDump( n->l )
 		exprDump( n->r )
 	end select
@@ -2503,6 +2596,8 @@ private function exprNewVREG _
 		'' field accesses:
 		''        *(vregtype*)&sym
 		''        *(vregtype*)((uint8*)&sym + offset)
+		'' addrof var:
+		''        (vregtype)((uint8*)&sym + offset)
 
 		have_offset = ((vreg->ofs <> 0) or (vreg->vidx <> NULL))
 
@@ -2511,7 +2606,8 @@ private function exprNewVREG _
 		'' - symbol is an array in the C code? (arrays, fixlen strings...)
 		''   cannot just do (elementtype)carray, it must always be
 		''   *(elementtype*)carray to access the memory in these cases.
-		dim as integer do_deref = have_offset or symbIsCArray( vreg->sym )
+		var is_c_array = symbIsCArray( vreg->sym )
+		var do_deref = have_offset or is_c_array
 
 		l = exprNewSYM( vreg->sym )
 
@@ -2528,12 +2624,18 @@ private function exprNewVREG _
 
 			'' any structs involved? (note: FBSTRINGs are structs in the C code too!)
 			select case( typeGet( vreg->dtype ) )
-			case FB_DATATYPE_STRING, FB_DATATYPE_STRUCT
+			case FB_DATATYPE_STRING
 				do_deref = TRUE
+			case FB_DATATYPE_STRUCT
+				'' don't deref if it is a va_list[1] type, unless we going to anyway
+				do_deref or= not symbIsValistStructArray( symbGetFullType( vreg->sym ), symbGetSubType( vreg->sym ) )
 			case else
 				select case( typeGet( symdtype ) )
-				case FB_DATATYPE_STRING, FB_DATATYPE_STRUCT
+				case FB_DATATYPE_STRING
 					do_deref = TRUE
+				case FB_DATATYPE_STRUCT
+					'' don't deref if it is a va_list[1] type, unless we going to anyway
+					do_deref or= not symbIsValistStructArray( symbGetFullType( vreg->sym ), symbGetSubType( vreg->sym ) )
 				end select
 			end select
 		end if
@@ -2545,8 +2647,8 @@ private function exprNewVREG _
 
 		'' Deref/addrof trick
 
-		'' Add '&' for things that aren't pointers already
-		if( typeIsPtr( symdtype ) = FALSE ) then
+		'' Add '&' if symbol isn't emitted as pointer already
+		if( is_c_array = FALSE ) then
 			l = exprNewUOP( AST_OP_ADDROF, l )
 		end if
 		if( have_offset ) then
@@ -3047,14 +3149,12 @@ private sub _emitJmpTb _
 		byval labels as FBSYMBOL ptr ptr, _
 		byval labelcount as integer, _
 		byval deflabel as FBSYMBOL ptr, _
-		byval minval as ulongint, _
-		byval maxval as ulongint _
+		byval bias as ulongint, _
+		byval span as ulongint _
 	)
 
 	dim as string tb, temp, ln
-	dim as FBSYMBOL ptr label = any
 	dim as EXPRNODE ptr l = any
-	dim as integer i = any
 
 	var dtype = v1->dtype
 	assert( (dtype = FB_DATATYPE_UINT) or (dtype = FB_DATATYPE_ULONGINT) )
@@ -3074,13 +3174,16 @@ private sub _emitJmpTb _
 
 	tb = *symbUniqueId( )
 
-	l = exprNewIMMi( maxval - minval + 1 )
+	l = exprNewIMMi( span + 1 )
 	hWriteLine( "static const void* " + tb + "[" + exprFlush( l ) + "] = {", TRUE )
 	sectionIndent( )
 
-	i = 0
-	for value as ulongint = minval to maxval
+	var i = 0
+	var value = 0
+	do
 		assert( i < labelcount )
+
+		dim as FBSYMBOL ptr label
 		if( value = values[i] ) then
 			label = labels[i]
 			i += 1
@@ -3088,26 +3191,27 @@ private sub _emitJmpTb _
 			label = deflabel
 		end if
 		hWriteLine( "&&" + *symbGetMangledName( label ) + ",", TRUE )
-	next
+
+		if( value = span ) then
+			exit do
+		end if
+		value += 1
+	loop
 
 	sectionUnindent( )
 	hWriteLine( "};", TRUE )
 
-	if( minval > 0 ) then
-		'' if( temp < minval ) goto deflabel
-		l = exprNewTEXT( dtype, NULL, temp )
-		l = exprNewBOP( AST_OP_LT, l, exprNewIMMi( minval, dtype ) )
-		hWriteLine( "if( " + exprFlush( l ) + " ) goto " + *symbGetMangledName( deflabel ) + ";", TRUE )
-	end if
-
-	'' if( temp > maxval ) then goto deflabel
+	'' if( (temp-bias) > span ) then goto deflabel
 	l = exprNewTEXT( dtype, NULL, temp )
-	l = exprNewBOP( AST_OP_GT, l, exprNewIMMi( maxval, dtype ) )
+	if( bias <> 0 ) then
+		l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( bias, dtype ) )
+	end if
+	l = exprNewBOP( AST_OP_GT, l, exprNewIMMi( span, dtype ) )
 	hWriteLine( "if( " + exprFlush( l ) + " ) goto " + *symbGetMangledName( deflabel ) + ";", TRUE )
 
-	'' l = jumptable[l - minval]
+	'' l = jumptable[l - bias]
 	l = exprNewTEXT( dtype, NULL, temp )
-	l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( minval, dtype ) )
+	l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( bias, dtype ) )
 	hWriteLine( "goto *" + tb + "[" + exprFlush( l ) + "];", TRUE )
 
 end sub
@@ -3127,6 +3231,40 @@ private sub _emitMem _
 		hWriteLine("__builtin_memcpy( " + exprFlush( exprNewVREG( v1 ) ) + ", " + exprFlush( exprNewVREG( v2 ) ) + ", " + str( cunsg( bytes ) ) + " );" )
 	end select
 
+end sub
+
+private sub _emitMacro _
+	( _
+		byval op as integer, _
+		byval v1 as IRVREG ptr, _
+		byval v2 as IRVREG ptr, _
+		byval vr as IRVREG ptr _
+	)
+
+	dim as EXPRNODE ptr l = any, r = any
+
+	select case op
+	case AST_OP_VA_START
+		l = exprNewVREG( v1 )
+		r = exprNewVREG( v2 )
+		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
+
+	case AST_OP_VA_END
+		l = exprNewVREG( v1 )
+		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, NULL ) ) + ";" )
+
+	case AST_OP_VA_ARG
+		l = exprNewVREG( v1 )
+		l = exprNewMACRO( op, vr->dtype, vr->sym, l, NULL )
+		exprSTORE( vr, l )
+
+	case AST_OP_VA_COPY
+		l = exprNewVREG( v1 )
+		r = exprNewVREG( v2 )
+		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
+
+	end select
+	
 end sub
 
 private sub _emitDECL( byval sym as FBSYMBOL ptr )
@@ -3160,11 +3298,15 @@ private sub _emitDBG _
 	( _
 		byval op as integer, _
 		byval proc as FBSYMBOL ptr, _
-		byval ex as integer _
+		byval lnum as integer, _
+		ByVal filename As zstring ptr _
 	)
 
 	if( op = AST_OP_DBG_LINEINI ) then
-		ctx.linenum = ex
+		ctx.linenum = lnum
+		if( filename <> NULL ) then
+			hUpdateCurrentFileName( filename )
+		end if
 	end if
 
 end sub
@@ -3290,12 +3432,15 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 
 		select case( n->type )
 		case AST_ASMTOK_TEXT
+			'' -asm intel: ASM keywords, string literals, constants, etc.
+			'' -asm att: String literals containing the ASM, tokens for the constraints lists, etc.
+			'' Symbol references in the asm strings for -asm att must use the ASM name already,
+			'' since we don't parse the string literal content.
 			asmcode += *n->text
 
 		case AST_ASMTOK_SYMB
-			if( sectionInsideProc( ) ) then
-				var id = symbGetMangledName( n->sym )
-				if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+			if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+				if( sectionInsideProc( ) ) then
 					select case( n->sym->class )
 					case FB_SYMBCLASS_VAR
 						'' Referencing a variable: insert %N place-holder...
@@ -3313,13 +3458,13 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 							if( len( inputconstraints ) > 0 ) then
 								inputconstraints  += ", "
 							end if
-							inputconstraints  +=  """m"" (" + *id + ")"
+							inputconstraints  +=  """m"" (" + *symbGetMangledName( n->sym ) + ")"
 						else
 							'' read+write output operand constraint: "+m" (symbol)
 							if( len( outputconstraints ) > 0 ) then
 								outputconstraints += ", "
 							end if
-							outputconstraints += """+m"" (" + *id + ")"
+							outputconstraints += """+m"" (" + *symbGetMangledName( n->sym ) + ")"
 						end if
 
 					case FB_SYMBCLASS_LABEL
@@ -3332,20 +3477,25 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 						if( len( labellist ) > 0 ) then
 							labellist += ", "
 						end if
-						labellist += *id
+						labellist += *symbGetMangledName( n->sym )
 
 					case else
-						'' Referencing a procedure: emit as-is, no gcc constraints needed
-						asmcode += *id
+						'' Referencing a procedure: no gcc constraints needed;
+						'' instead emit the symbol directly with its ASM name.
+						asmcode += hGetMangledNameForASM( n->sym, TRUE )
 					end select
 				else
-					'' -asm att: Expecting FB inline asm to be in gcc's format already,
-					'' emit everything as-is.
-					asmcode += *id
+					'' Inside NAKED procedure: Currently emitted as pure inline asm,
+					'' so constraints are (hopefully!?) not needed.
+					asmcode += hGetMangledNameForASM( n->sym, TRUE )
 				end if
 			else
-				'' In NAKED procedure
-				asmcode += hGetMangledNameForASM( n->sym, TRUE )
+				'' -asm att: Since the FB inline asm is in gcc's format already,
+				'' AST_ASMTOK_SYMB can only appear for symbol tokens in the constraints list,
+				'' for which we must emit the symbol with its C name.
+				'' FIXME: AST_ASMTOK_SYMB (reference to C symbol) can't be supported inside NAKED procedures currently,
+				'' because they are emitted as pure inline asm (string literals).
+				asmcode += *symbGetMangledName( n->sym )
 			end if
 
 		end select
@@ -3461,11 +3611,18 @@ end sub
 
 private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 	var dtype = symbGetType( sym )
+
+	'' AST stores boolean true as -1, but we emit it as 1 for gcc compatibility
+	if( (dtype = FB_DATATYPE_BOOLEAN) and (value <> 0) ) then
+		value = 1
+	end if
+
 	var l = exprNewIMMi( value, dtype )
 	if( symbIsRef( sym ) ) then
 		dtype = typeAddrOf( dtype )
 	end if
 	l = exprNewCAST( dtype, sym->subtype, l )
+
 	ctx.varini += exprFlush( l )
 	hVarIniSeparator( )
 end sub
@@ -3636,13 +3793,7 @@ private sub _emitProcBegin _
 		byval initlabel as FBSYMBOL ptr _
 	)
 
-	dim as zstring ptr incfile = any
-
-	incfile = symbGetProcIncFile( proc )
-	if( incfile = NULL ) then
-		incfile = @env.inf.name
-	end if
-	hUpdateCurrentFileName( incfile )
+	hUpdateCurrentFileName( symbGetProcIncFile( proc ) )
 
 	irhlEmitProcBegin( )
 
@@ -3653,7 +3804,7 @@ private sub _emitProcBegin _
 
 	hWriteLine( "", TRUE )
 
-	if( env.clopt.debug ) then
+	if( env.clopt.debuginfo ) then
 		_emitDBG( AST_OP_DBG_LINEINI, proc, proc->proc.ext->dbg.iniline )
 	end if
 
@@ -3779,6 +3930,7 @@ dim shared as IR_VTBL irhlc_vtbl = _
 	@_emitBranch, _
 	@_emitJmpTb, _
 	@_emitMem, _
+	@_emitMacro, _
 	@_emitScopeBegin, _
 	@_emitScopeEnd, _
 	@_emitDECL, _

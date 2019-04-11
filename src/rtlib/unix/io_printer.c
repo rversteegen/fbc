@@ -42,7 +42,7 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 	{
 		if( lpt_proto!=NULL )
 			free(lpt_proto);
-			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
 	devInfo->iPort = iPort;
@@ -125,7 +125,7 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 
 	} else {
 		/* use direct port io */
-		filename = alloca( 16 );
+		filename = alloca( 7 + 11 + 1 );
 		sprintf(filename, "/dev/lp%d", (devInfo->iPort-1));
 		fp = fopen(filename, "wb");
 

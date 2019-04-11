@@ -1,5 +1,6 @@
 {{fbdoc item="title" value="USHORT"}}----
-Standard data type: 16 bit unsigned
+Standard data type: 16 bit unsigned.
+Equivalent to ##[[KeyPgUnsigned|Unsigned]] [[KeyPgShort|Short]]##.
 
 {{fbdoc item="syntax"}}##
 	[[KeyPgDim|dim]] //variable// [[KeyPgAs|as]] **Ushort**
@@ -13,9 +14,8 @@ Standard data type: 16 bit unsigned
   Dim y As UShort = &HFFFF
   Print "UShort Range = "; x; " to "; y
 %%
-	**Output:**
+	Output:
 	%%UShort Range = 0 to 65535%%
-
 
 {{fbdoc item="lang"}}
 	- Not available in the //[[CompilerOptlang|-lang qb]]// dialect unless referenced with the alias ##**""__Ushort""**##.
