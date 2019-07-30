@@ -372,7 +372,7 @@ $(LOG_TESTS_LOG_LST) : $(LOG_TESTS_INC)
 #
 #
 $(LOG_TESTS_RESULTS_LOG): $(LOG_TESTS_LOG_LST) $(LOGLIST_ALL)
-	@$(XARGS) -a $(LOG_TESTS_LOG_LST) $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' ; true > $@ 
+	@cat $(LOG_TESTS_LOG_LST) | $(XARGS) $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' ; true > $@ 
 
 results : $(LOG_TESTS_RESULTS_LOG)
 
