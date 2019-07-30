@@ -23,54 +23,38 @@
 
 namespace fb.fbdoc
 
-	type CWikiConCtx as CWikiConCtx_
-		
-	type CWikiCon
+	type CWikiCon extends object
 
-		declare static sub GlobalInit()
+		declare constructor()
+		declare virtual destructor()
 
-		declare constructor _
+		declare virtual function LoadPage _
 			( _
-				byval url as zstring ptr = NULL, _
-				byval ca_file as zstring ptr = NULL _
-			)
-
-		declare destructor _
-			( _
-			)
-
-		declare function Login _
-			( _
-				byval username as zstring ptr, _
-				byval password as zstring ptr _
-			) as integer
-
-
-		declare function LoadPage _
-			( _
-				byval page as zstring ptr, _
-				byval israw as integer, _
-				byval getid as integer = TRUE, _
+				byval pagename as zstring ptr, _
 				byref body as string _
-			) as integer
+			) as boolean
 
-		declare function StorePage _
+		declare virtual function LoadIndex _
+			( _
+				byval pagename as zstring ptr, _
+				byref body as string _
+			) as boolean
+
+		declare virtual function StorePage _
 			( _
 				byval body as zstring ptr, _
 				byval note as zstring ptr _
-			) as integer
+			) as boolean
 
-		declare function StoreNewPage _
+		declare virtual function StoreNewPage _
 			( _
 				byval body as zstring ptr, _
 				byval pagename as zstring ptr _
-			) as integer
+			) as boolean
 
-		declare function GetPageID _
+		declare virtual function GetPageID _
 			( _
 			) as integer
-
-		ctx as CWikiConCtx ptr
 
 	end type
 

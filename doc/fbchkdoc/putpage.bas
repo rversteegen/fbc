@@ -87,7 +87,8 @@ if( app_opt.help ) then
 end if
 
 cmd_opts_resolve()
-cmd_opts_check()
+cmd_opts_check_cache()
+cmd_opts_check_url()
 
 '' --------------------------------------------------------
 
@@ -97,9 +98,9 @@ sNote = "Auto-update"
 sNoteDef = ""
 
 dim as CWikiCache ptr wikicache = NULL
-dim as CWikiCon ptr wikicon = NULL
+dim as CWikiConUrl ptr wikicon = NULL
 
-if( app_opt.webPageCount = 0 ) then
+if( app_opt.pageCount = 0 ) then
 	print "No pages specified"
 end if
 
@@ -110,7 +111,7 @@ if wikicache = NULL then
 	end 1
 end if
 
-wikicon = new CWikiCon( app_opt.wiki_url, app_opt.ca_file )
+wikicon = new CWikiConUrl( app_opt.wiki_url, app_opt.ca_file )
 if wikicon = NULL then
 	print "Unable to create connection " + app_opt.wiki_url
 	delete wikicache
@@ -118,7 +119,7 @@ if wikicon = NULL then
 end if
 
 '' we have web pages? go to work...
-if( app_opt.webPageCount > 0 ) then
+if( app_opt.pageCount > 0 ) then
 	dim as integer i
 	dim as string ret
 	print "URL: "; app_opt.wiki_url
@@ -128,62 +129,63 @@ if( app_opt.webPageCount > 0 ) then
 		print "Certificate: none"
 	end if
 	print "cache: "; app_opt.cache_dir
-	for i = 1 to app_opt.webPageCount
-		sPage = app_opt.webPageList(i)
-		sComment = app_opt.webPageComments(i)
+	for i = 1 to app_opt.pageCount
+		sPage = app_opt.pageList(i)
+		sComment = app_opt.pageComments(i)
 		sBody = ""
 		print "Loading '" + sPage + "': ";
 		if( wikicache->LoadPage( sPage, sBody ) ) = FALSE then
 			print "Unable to load"
 		else
 			print "OK"
-			if( wikicon->LoadPage( sPage, TRUE, TRUE, sBodyOld ) <> FALSE ) then
-				if( wikicon->GetPageID() > 0 ) then
-					if( wikicon->Login( app_opt.wiki_username, app_opt.wiki_password ) ) = FALSE then
-						print "Unable to login"
-					else
-						if( iComment > 0 ) then
-							if( iComment = 1 or sNoteDef = "" ) then
-								print "Enter note for '" + sPage + "' : ";
-								Line input sNote
-								if trim(sNote) = "" then sNote = "Auto-Update"
-								sNoteDef = sNote
-							else
-								sNote = sNoteDef
-							end if
+			
+			'' wikicon->LoadPage() may return FALSE if the page does not
+			'' yet exist.  Test the page ID instead to determine if it
+			'' is a new page
+			wikicon->LoadPage( sPage, sBodyOld )
+			if( wikicon->GetPageID() > 0 ) then
+				if( wikicon->Login( app_opt.wiki_username, app_opt.wiki_password ) ) = FALSE then
+					print "Unable to login"
+				else
+					if( iComment > 0 ) then
+						if( iComment = 1 or sNoteDef = "" ) then
+							print "Enter note for '" + sPage + "' : ";
+							Line input sNote
+							if trim(sNote) = "" then sNote = "Auto-Update"
+							sNoteDef = sNote
 						else
-							if( sComment > "" ) then
-								sNote = sComment
-							elseif( sNoteDef > "" ) then
-								sNote = sNoteDef
-							else
-								sNote = ""
-							end if
+							sNote = sNoteDef
 						end if
-
-						print "Storing '" + sPage + "' [" + sNote + "] : ";
-
-						if( wikicon->StorePage( sBody, sNote ) = FALSE ) then
-							print "FAILED"
+					else
+						if( sComment > "" ) then
+							sNote = sComment
+						elseif( sNoteDef > "" ) then
+							sNote = sNoteDef
 						else
-							print "OK"
+							sNote = ""
 						end if
 					end if
-				else
-					print "Unable to get existing page ID - will try to store as a new page .."
-					if( wikicon->Login( app_opt.wiki_username, app_opt.wiki_password ) ) = FALSE then
-						print "Unable to login"
+
+					print "Storing '" + sPage + "' [" + sNote + "] : ";
+
+					if( wikicon->StorePage( sBody, sNote ) = FALSE ) then
+						print "FAILED"
 					else
-						print "Storing '" + sPage + "': ";
-						if( wikicon->StoreNewPage( sBody, sPage ) = FALSE ) then
-							print "FAILED"
-						else
-							print "OK"
-						end if
+						print "OK"
 					end if
 				end if
 			else
-				print "Unable to existing page"
+				print "Unable to get existing page ID - will try to store as a new page .."
+				if( wikicon->Login( app_opt.wiki_username, app_opt.wiki_password ) ) = FALSE then
+					print "Unable to login"
+				else
+					print "Storing '" + sPage + "': ";
+					if( wikicon->StoreNewPage( sBody, sPage ) = FALSE ) then
+						print "FAILED"
+					else
+						print "OK"
+					end if
+				end if
 			end if
 		end if
 	next

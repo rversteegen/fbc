@@ -1,15 +1,59 @@
 Version 1.07.0
 
 [changed]
+- SADD/STRPTR(wstring) returns WSTRING PTR
+- '-v' be verbose command line option affects '-help' output
+- fbc aarch64 target by default maps to '-march=armv8-a' when passing options to gcc/LLVM (czsgaba)
 
 [added]
 - CVA_LIST type, CVA_START(), CVA_COPY() CVA_END(), CVA_ARG() macros will map to gcc's __builtin_va_list and __builtin_va_* macros in gcc backend
+- github #133: fbc makefile supports bootstrap-minimal target to build a bootstrap fbc with only the minimal features necessary to build another fbc. (William Breathitt Gray)
+- github #141: introduced '-strip'/'-nostrip' options to control symbol stripping of output files (William Breathitt Gray)
+- github #141: fbc will default to stripping symbols if '-d ENABLE_STRIPALL' is passed in FBCFLAGS (William Breathitt Gray)
+- github #141: makefile option 'ENABLE_STRIPALL=1' introduced to pass '-d ENABLE_STRIPALL' via FBCFLAGS (William Breathitt Gray)
+- makefile: 'ENABLE_STRIPALL=1' passes '-d ENABLE_STRIPALL' via FBCFLAGS on all targets
+- makefile: 'ENABLE_STRIPALL=0' disables passing '-d ENABLE_STRIPALL' via FBCFLAGS on all targets
+- makefile: '-d ENABLE_STRIPALL' passed by default for dos/win32 targets when 'ENABLE_STRIPALL=0' not explicitly given
+- 'TYPE udt EXTENDS Z|WSTRING' allowed to specify that UDT is a kind of Z|WSTRING
+- LTRIM/RTRIM/TRIM will accept UDT as Z|WSTRING
+- LCASE/UCASE will accept UDT as Z|WSTRING
+- Cxxx() conversion functions will accept UDT as Z|WSTRING
+- INSTR/INSTRREV will accept UDT as Z|WSTRING
+- MID function will accept UDT as Z|WSTRING
+- SADD/STRPTR will accept UDT as Z|WSTRING to return Z|WSTRING ptr
+- LSET/RSET statements will accept UDT as Z|WSTRING
+- MID statement will accept UDT as Z|WSTRING
+- ASC function will accept UDT as Z|WSTRING
+- STR/WSTR function will accept UDT as Z|WSTRING to return a Z|WSTRING
+- SELECT statement will accept UDT as Z|WSTRING to return a Z|WSTRING
+- SWAP statement will accept UDT as Z|WSTRING
+- IIF function will accept UDT as Z|WSTRING
+- PRINT/LPRINT/WRITE will accept UDT as Z|WSTRING
+- '-earray' command line option to enable array bounds checking
+- '-enullptr' command line option to enable null pointer checking 
+- '-eassert' command line option to enable assert() and assertwarn() checking
+- '-edebug' command line option to enable __FB_DEBUG__
+- '-edebuginfo' command line option to enable debug symbols
+- '-elocation' command line option to enable reporting error location
 - Implemented objinfo for Darwin/OSX Mach-O .o files, so #inclib etc. work
 
 [fixed]
-- #881: C backend: support for varadic function parameters in gcc using __builtin_va_list type and related macros
+- sf.net #881: C backend: support for varadic function parameters in gcc using __builtin_va_list type and related macros
 - push/pop correct GL_PROJECTION matrix and GL_MODELVIEW matrix when setting up graphics screen (gothon)
 - fix char & wchar concatentation.  For char double byte characters (such as Chinese characters), the "wstr = char & wchar" would become "wstr = char & chrw(0) & wchar" (SkyFish)
+- github #131: Fix fbc makefile bootstrap recipe race condition (William Breathitt Gray)
+- sf.net #794: literal tabs in string literals miscompiled if followed by 0-9 numeric chars
+- sf.net #897: length of literal wstring is miscalculated at compile time.  Compile time evaluation of len(!"\u1234") was using the internal escaped string length instead of the actual codepoint length
+- github #137: Final -Wl flag takes precedence over previous.  fbc now passes down all options from all -Wa, -Wc, and -Wl flags (William Breathitt Gray)
+- github #138: rtlib: freebsd: Fix deprecated use of VM_METER to use VM_TOTAL (William Breathitt Gray)
+- sf.net #899: TRIM( wstring ) causes crash if string is single space
+- sf.net #900: LTRIM( wstring, filter ) and TRIM( wstring, filter ) truncate result if filter is zero length string
+- github #116: Fix optimizations in [L/R]TrimAny rtlib functions (SkyFish)
+- github #145: WSTRING concat and assign buffer (&=) overrun
+- sf.net #893: 'Suffixes are only valid in -lang' error message showing incorrect -lang options allowed
+- fbc uses '-march=armv8-a' instead of invalid option '-march=aarch64' when passing options to gcc/LLVM (czsgaba)
+- rtlib: sys/io.h incorrectly included on systems that do not provide it.  It is used only for x86, x86_64 and is unnecessary for all other linux targets (armhf ,arm64, mips ....)
+- SELECT CASE AS CONST checks for ranges that would produce unreasonably large jump tables (greater than 8192 entries)
 
 
 Version 1.06.0

@@ -64,8 +64,9 @@
 #   warning-tests
 #   clean-tests
 #
-#   bootstrap-dist  Create source package with precompiled fbc sources
-#   bootstrap       Build fbc from the precompiled sources (only if precompiled sources exist)
+#   bootstrap-dist      Create source package with precompiled fbc sources
+#   bootstrap           Build fbc from the precompiled sources (only if precompiled sources exist)
+#   bootstrap-minimal   Build fbc from the precompiled sources (only if precompiled sources exist) with only the minimal features needed to compile another fbc
 #
 # makefile configuration:
 #   FB[C|L]FLAGS     to set -g -exx etc. for the compiler build and/or link
@@ -80,6 +81,8 @@
 #   ENABLE_SUFFIX=-0.24    append a string like "-0.24" to fbc/FB dir names,
 #                          and use "-d ENABLE_SUFFIX=$(ENABLE_SUFFIX)" (non-standalone only)
 #   ENABLE_LIB64=1         use prefix/lib64/ instead of prefix/lib/ for 64bit libs (non-standalone only)
+#   ENABLE_STRIPALL=1      use "-d ENABLE_STRIPALL" with all targets
+#   ENABLE_STRIPALL=0      disable "-d ENABLE_STRIPALL" with all targets
 #   FBPACKAGE     bindist: The package/archive file name without path or extension
 #   FBPACKSUFFIX  bindist: Allows adding a custom suffix to the normal package name (and the toplevel dir in the archive)
 #   FBMANIFEST    bindist: The manifest file name without path or extension
@@ -91,6 +94,7 @@
 #   -d ENABLE_SUFFIX=-0.24   assume FB's lib dir uses the given suffix (non-standalone only)
 #   -d ENABLE_PREFIX=/some/path   hard-code specific $(prefix) into fbc
 #   -d ENABLE_LIB64          use prefix/lib64/ instead of prefix/lib/ for 64bit libs (non-standalone only)
+#   -d ENABLE_STRIPALL       configure fbc to pass down '--strip-all' to linker by default
 #
 # rtlib/gfxlib2 source code configuration (CFLAGS):
 #   -DDISABLE_X11    build without X11 headers (disables X11 gfx driver)
@@ -368,6 +372,11 @@ ALLFBCFLAGS += -e -m fbc -w pedantic
 ALLFBLFLAGS += -e -m fbc -w pedantic
 ALLCFLAGS += -Wall -Wextra -Wno-unused-parameter -Werror-implicit-function-declaration
 
+ifneq ($(filter bootstrap-minimal, $(MAKECMDGOALS)),)
+  # Disable features not needed to compile a minimal bootstrap fbc
+  ALLCFLAGS += -DDISABLE_GPM -DDISABLE_FFI -DDISABLE_X11
+endif
+
 ifeq ($(TARGET_OS),xbox)
   ifeq ($(OPENXDK),)
     $(error Please set OPENXDK=<OpenXDK directory>)
@@ -423,6 +432,17 @@ endif
 ifdef ENABLE_LIB64
   ALLFBCFLAGS += -d ENABLE_LIB64
 endif
+ifdef ENABLE_STRIPALL
+  ifneq ($(ENABLE_STRIPALL),0)
+    ALLFBCFLAGS += -d ENABLE_STRIPALL
+  endif
+else
+  # by default dos and windows use --strip-all
+  ifneq ($(filter dos win32,$(TARGET_OS)),)
+    ALLFBCFLAGS += -d ENABLE_STRIPALL
+  endif
+endif
+
 
 ALLFBCFLAGS += $(FBCFLAGS) $(FBFLAGS)
 ALLFBLFLAGS += $(FBLFLAGS) $(FBFLAGS)
@@ -1061,9 +1081,11 @@ bootstrap-dist:
 # Build the fbc[.exe] binary from the precompiled sources in the bootstrap/
 # directory.
 #
+.PHONY: bootstrap bootstrap-minimal
+bootstrap: gfxlib2 bootstrap-minimal
+
 BOOTSTRAP_FBC := bootstrap/fbc$(EXEEXT)
-.PHONY: bootstrap
-bootstrap: gfxlib2 $(BOOTSTRAP_FBC)
+bootstrap-minimal: $(BOOTSTRAP_FBC)
 	mkdir -p bin
 	cp $(BOOTSTRAP_FBC) $(FBC_EXE)
 
