@@ -407,8 +407,9 @@ clean_tests :
 	@$(ECHO) Cleaning log-tests for -lang $(FB_LANG) ...
 	$(RM) $(LOG_TESTS_RESULTS_LOG)
 ifneq ($(LOGLIST_ALL),)
-	@if [ -f $(LOG_TESTS_LOG_LST) ]; then $(XARGS) -r -a $(LOG_TESTS_LOG_LST) $(RM) ; fi
-	@if [ -f $(LOG_TESTS_OBJ_LST) ]; then $(XARGS) -r -a $(LOG_TESTS_OBJ_LST) $(RM) ; fi
+	@if [ -s $(LOG_TESTS_LOG_LST) ]; then cat $(LOG_TESTS_LOG_LST) | $(XARGS) $(RM) ; fi
+	@if [ -s $(LOG_TESTS_OBJ_LST) ]; then cat $(LOG_TESTS_OBJ_LST) | $(XARGS) $(RM) ; fi
+
 endif
 
 ifneq ($(APPLIST_COMPILE_AND_RUN_OK),)
