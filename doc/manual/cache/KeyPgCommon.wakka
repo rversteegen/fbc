@@ -5,7 +5,7 @@ Variable declaration and scope modifier
 	**Common** [[[KeyPgShared|Shared]]] //symbolname//[()] [AS [[DataType|DataType]]] [, ...]
 ##
 {{fbdoc item="desc"}}
-	Declares a variable which is shared between code modules. A matching ##**Common**## statement must appear in all other code modules using the variable. 
+	Declares a variable which is shared between code modules, including those compiled as static libraries, but not those compiled as dynamic libraries (DLLs). A matching ##**Common**## statement must appear in all other code modules using the variable. 
 	
 	##**Common**## variables cannot be initialized.
 	##**Common**## arrays are always variable-length, and must be defined with an empty parameter list ##()##, and its dimensions set in a later ##[[KeyPgDim|Dim]]## or ##[[KeyPgRedim|Redim]]## statement.
@@ -21,7 +21,7 @@ Declare Sub initme()
 
 Common Shared foo() As Double
 
-Redim foo(0 To 2) As Double
+Redim foo(0 To 2)
 
 initme()
 
@@ -39,7 +39,9 @@ Sub initme()
   foo(2) = foo(1)*2
 End Sub
 %%
-Output:
+After compiling the two files like:
+##fbc common1.bas common2.bas##
+running ##common1## produces the output:
 %%
  3.141592653589793           1.047197551196598           2.094395102393195
 %%

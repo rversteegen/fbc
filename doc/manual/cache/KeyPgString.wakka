@@ -92,5 +92,8 @@ silly_print( "Status: " + status )
 	- ##[[KeyPgStr|Str]]##
 	- ##[[KeyPgOpStrptr|Strptr]]##
 	- ##[[KeyPgOpVarptr|Varptr]]##
+	- ##[[TblVarTypes|Standard Data Type Limits]]##
+	- ##{{fbdoc item="keyword" value="KeyPgOpStringIndex|Operator [] (String index)"}}##
+	- ##[[CatPgOpString|String Operators]]##
 
 {{fbdoc item="back" value="CatPgStdDataTypes|Standard Data Types"}}{{fbdoc item="back" value="CatPgString|String Functions"}}

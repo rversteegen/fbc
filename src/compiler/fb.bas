@@ -243,7 +243,7 @@ dim shared as FBCPUTYPEINFO cputypeinfo(0 to FB_CPUTYPE__COUNT-1) = _
 	( NULL       , @"armv5te"      , FB_CPUFAMILY_ARM    , 32 ), _ '' FB_CPUTYPE_ARMV5TE
 	( NULL       , @"armv6"        , FB_CPUFAMILY_ARM    , 32 ), _ '' FB_CPUTYPE_ARMV6
 	( NULL       , @"armv7-a"      , FB_CPUFAMILY_ARM    , 32 ), _ '' FB_CPUTYPE_ARMV7A
-	( NULL       , @"aarch64"      , FB_CPUFAMILY_AARCH64, 64 )  _ '' FB_CPUTYPE_AARCH64
+	( @"armv8-a" , @"aarch64"      , FB_CPUFAMILY_AARCH64, 64 )  _ '' FB_CPUTYPE_AARCH64
 }
 
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -326,6 +326,23 @@ function fbGetLangName _
 	) as string
 
 	function = *langTb(lang).name
+
+end function
+
+'':::::
+function fbGetBackendName _
+	( _
+		byval lang as FB_BACKEND _
+	) as string
+
+	select case env.clopt.backend
+	case FB_BACKEND_GAS
+		function = "gas"
+	case FB_BACKEND_GCC
+		function = "gcc"
+	case FB_BACKEND_LLVM
+		function = "llvm"
+	end select
 
 end function
 
@@ -470,10 +487,14 @@ sub fbGlobalInit()
 	env.clopt.lang          = FB_DEFAULT_LANG
 	env.clopt.forcelang     = FALSE
 
+	env.clopt.debug         = FALSE
 	env.clopt.debuginfo     = FALSE
 	env.clopt.assertions    = FALSE
 	env.clopt.errorcheck    = FALSE
 	env.clopt.extraerrchk   = FALSE
+	env.clopt.errlocation   = FALSE
+	env.clopt.arrayboundchk = FALSE
+	env.clopt.nullptrchk    = FALSE
 	env.clopt.resumeerr     = FALSE
 	env.clopt.profile       = FALSE
 
@@ -540,6 +561,8 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 	case FB_COMPOPT_FORCELANG
 		env.clopt.forcelang = value
 
+	case FB_COMPOPT_DEBUG
+		env.clopt.debug = value
 	case FB_COMPOPT_DEBUGINFO
 		env.clopt.debuginfo = value
 	case FB_COMPOPT_ASSERTIONS
@@ -550,6 +573,12 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 		env.clopt.resumeerr = value
 	case FB_COMPOPT_EXTRAERRCHECK
 		env.clopt.extraerrchk = value
+	case FB_COMPOPT_ERRLOCATION
+		env.clopt.errlocation = value
+	case FB_COMPOPT_ARRAYBOUNDCHECK
+		env.clopt.arrayboundchk = value
+	case FB_COMPOPT_NULLPTRCHECK
+		env.clopt.nullptrchk = value
 	case FB_COMPOPT_PROFILE
 		env.clopt.profile = value
 
@@ -564,6 +593,8 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 
 	case FB_COMPOPT_GOSUBSETJMP
 		env.clopt.gosubsetjmp = value
+	case FB_COMPOPT_VALISTASPTR
+		env.clopt.valistasptr = value
 	case FB_COMPOPT_EXPORT
 		env.clopt.export = value
 	case FB_COMPOPT_MSBITFIELDS
@@ -617,6 +648,8 @@ function fbGetOption( byval opt as integer ) as integer
 	case FB_COMPOPT_FORCELANG
 		function = env.clopt.forcelang
 
+	case FB_COMPOPT_DEBUG
+		function = env.clopt.debug
 	case FB_COMPOPT_DEBUGINFO
 		function = env.clopt.debuginfo
 	case FB_COMPOPT_ASSERTIONS
@@ -627,6 +660,12 @@ function fbGetOption( byval opt as integer ) as integer
 		function = env.clopt.resumeerr
 	case FB_COMPOPT_EXTRAERRCHECK
 		function = env.clopt.extraerrchk
+	case FB_COMPOPT_ERRLOCATION
+		function = env.clopt.errlocation
+	case FB_COMPOPT_ARRAYBOUNDCHECK
+		function = env.clopt.arrayboundchk
+	case FB_COMPOPT_NULLPTRCHECK
+		function = env.clopt.nullptrchk
 	case FB_COMPOPT_PROFILE
 		function = env.clopt.profile
 
@@ -641,6 +680,8 @@ function fbGetOption( byval opt as integer ) as integer
 
 	case FB_COMPOPT_GOSUBSETJMP
 		function = env.clopt.gosubsetjmp
+	case FB_COMPOPT_VALISTASPTR
+		function = env.clopt.valistasptr
 	case FB_COMPOPT_EXPORT
 		function = env.clopt.export
 	case FB_COMPOPT_MSBITFIELDS
@@ -1467,5 +1508,69 @@ function fbGetLangId _
 	case else
 		function = FB_LANG_INVALID
 	end select
+
+end function
+
+'':::::
+function fbGetBackendValistType _	
+	( _
+	) as FB_CVA_LIST_TYPEDEF
+
+	dim typedef as FB_CVA_LIST_TYPEDEF = FB_CVA_LIST_NONE
+
+	select case env.clopt.backend
+	case FB_BACKEND_GCC
+
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		case FB_CPUFAMILY_X86_64
+			select case env.clopt.target
+			case FB_COMPTARGET_WIN32
+				typedef = FB_CVA_LIST_BUILTIN_POINTER
+			case else
+				typedef = FB_CVA_LIST_BUILTIN_C_STD
+			end select
+
+		case FB_CPUFAMILY_ARM
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		case FB_CPUFAMILY_AARCH64
+			typedef = FB_CVA_LIST_BUILTIN_AARCH64
+
+		case else
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		end select
+
+	case FB_BACKEND_GAS
+		typedef = FB_CVA_LIST_POINTER
+
+	case FB_BACKEND_LLVM
+		'' ???
+		typedef = FB_CVA_LIST_POINTER
+
+	case else
+		typedef = FB_CVA_LIST_POINTER
+
+	end select
+
+	assert( typedef <> FB_CVA_LIST_NONE )
+
+	'' on gcc backend we prefer that the cva_list type
+	'' map to gcc's __builtin_va_list, which is a different
+	'' type depending on platform. If the combination of
+	'' target and arch support it, we can override this with 
+	'' -z valist-as-ptr to force use of pointer expressions
+	'' instead of builtins even though gcc is backend.
+
+	if( typedef = FB_CVA_LIST_BUILTIN_POINTER ) then
+		if( fbGetOption( FB_COMPOPT_VALISTASPTR ) ) then
+			typedef = FB_CVA_LIST_POINTER
+		endif
+	end if
+
+	function = typedef
 
 end function

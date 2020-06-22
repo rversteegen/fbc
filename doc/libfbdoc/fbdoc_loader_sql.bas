@@ -1,5 +1,5 @@
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2018 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -72,7 +72,7 @@ namespace fb.fbdoc
 			return FALSE
 		end if
 
-		sql = "SELECT tag, body FROM wikka_pages WHERE ( latest = 'Y' )"
+		sql = "SELECT tag, CAST(CONVERT(body USING utf8) AS binary) FROM wikka_pages WHERE ( latest = 'Y' )"
 
 		if( 0 <> mysql_real_query( @db, sql, len(sql)) ) then
 			printlog "Unable to query wikka_pages"

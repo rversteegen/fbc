@@ -11,7 +11,7 @@
 #     to build (or a tag/branch name).
 #
 # The standalone fbc is built in the same directory as the normal fbc, by just
-# rebuilding src/compiler/obj/fbc.o (that's all that's affected by
+# rebuilding src/compiler/obj/$fbtarget/fbc.o (that's all that's affected by
 # ENABLE_STANDALONE, except for the directory layout). This way we avoid
 # unnecessary full rebuilds.
 #
@@ -53,6 +53,15 @@
 #   remote name will default to 'other' if the --repo option was given.
 #   remote name will default to 'origin' if the --repo option was not given.
 #
+# --recipe name
+#   specify which build recipe to use.  Not all recipes are supported on all targets.
+#       -gcc-5.2.0
+#       -gcc-7.1.0
+#       -gcc-7.1.0r0
+#       -gcc-7.1.0r2
+#       -gcc-7.3.0
+#       -gcc-8.1.0
+#
 # Requirements:
 #   - MSYS environment on Windows with: bash, wget/curl, zip, unzip, patch, make, findutils
 #     (win32/win64 builds need to be able to run ./configure scripts, to build libffi)
@@ -74,7 +83,7 @@
 set -e
 
 usage() {
-	echo "usage: ./build.sh dos|linux-x86|linux-x86_64|win32|win32-mingworg|win64 <fbc commit id> [--offline] [--repo url] [--remote name]"
+	echo "usage: ./build.sh dos|linux-x86|linux-x86_64|win32|win32-mingworg|win64 <fbc commit id> [--offline] [--repo url] [--remote name] [--recipe name]"
 	exit 1
 }
 
@@ -93,6 +102,10 @@ case $arg in
 	;;
 --remote)
 	remote_name="$2"
+	shift; shift
+	;;
+--recipe)
+	recipe_name="$2"
 	shift; shift
 	;;
 dos|linux-x86|linux-x86_64|win32|win64)
@@ -126,6 +139,14 @@ if [ ! -z "$repo_url" ]; then
 	remote_name=${remote_name:-other}
 else
 	remote_name=${remote_name:-origin}
+fi
+
+# check recipe name
+# TODO: error on invalid combination of target and recipe
+if [ ! -z "$recipe_name" ]; then
+	recipe=$recipe_name
+else
+	recipe=""
 fi
 
 echo "building FB-$target (uname = `uname`, uname -m = `uname -m`)"
@@ -170,7 +191,7 @@ cd ../..
 
 cd build
 
-buildinfo=../output/buildinfo-$target.txt
+buildinfo=../output/buildinfo-$target$recipe.txt
 echo "fbc $fbccommit $target, build based on:" > $buildinfo
 echo >> $buildinfo
 
@@ -224,15 +245,46 @@ get_mingww64_toolchain() {
 	bits="$1"
 	arch="$2"
 
-	gccversion=5.2.0
-	mingwbuildsrev=rev0
+	case "$recipe" in
+	-gcc-8.1.0)
+		gccversion=8.1.0
+		mingwbuildsrev=rev0
+		mingwruntime=v6
+		;;
+	-gcc-7.3.0)
+		gccversion=7.3.0
+		mingwbuildsrev=rev0
+		mingwruntime=v5
+		;;
+	-gcc-7.1.0r2)
+		gccversion=7.1.0
+		mingwbuildsrev=rev2
+		mingwruntime=v5
+		;;
+	-gcc-7.1.0|-gcc-7.1.0r0)
+		gccversion=7.1.0
+		mingwbuildsrev=rev0
+		mingwruntime=v5
+		;;
+	-gcc-5.2.0)
+		gccversion=5.2.0
+		mingwbuildsrev=rev0
+		mingwruntime=v4
+		;;
+	*)
+		gccversion=5.2.0
+		mingwbuildsrev=rev0
+		mingwruntime=v4
+		;;
+	esac
+
 	dir=Toolchains%20targetting%20Win$bits/Personal%20Builds/mingw-builds/$gccversion/threads-win32/sjlj/
-	file=$arch-$gccversion-release-win32-sjlj-rt_v4-$mingwbuildsrev.7z
+	file=$arch-$gccversion-release-win32-sjlj-rt_$mingwruntime-$mingwbuildsrev.7z
 
 	mkdir -p ../input/MinGW-w64
 	download "MinGW-w64/$file" "http://sourceforge.net/projects/mingw-w64/files/$dir$file/download"
 
-	srcfile=src-$gccversion-release-rt_v4-$mingwbuildsrev.tar.7z
+	srcfile=src-$gccversion-release-rt_$mingwruntime-$mingwbuildsrev.tar.7z
 	download "MinGW-w64/$srcfile" "http://sourceforge.net/projects/mingw-w64/files/Toolchain%20sources/Personal%20Builds/mingw-builds/$gccversion/$srcfile/download"
 
 	7z x "../input/MinGW-w64/$file" > /dev/null
@@ -251,7 +303,7 @@ dos)
 
    	djver=205
 	gccver=710
-	djgppgccversiondir=7.1.0
+	djgppgccversiondir=7
 	bnuver=229
 	gdbver=771
 	djpkg=current
@@ -268,6 +320,9 @@ dos)
 	download_djgpp ${djpkg}/v2gnu/ fil41br2
 	download_djgpp ${djpkg}/v2gnu/ mak421b
 	download_djgpp ${djpkg}/v2gnu/ shl2011br2
+	download_djgpp ${djpkg}/v2gnu/ pth207b 
+
+	download_djgpp ${djpkg}/v2tk/ ls080b 
 
 	# Sources for stuff that goes into the FB-dos package (needs updating to new versions)
 	download_djgpp ${djpkg}/v2gnu/ bnu${bnuver}s
@@ -275,16 +330,21 @@ dos)
 	download_djgpp ${djpkg}/v2gnu/ gdb${gdbver}s
 	download_djgpp ${djpkg}/v2/    djlsr${djver}
 
-	unzip -q ../input/DJGPP/djdev${djver}.zip
+	unzip -qo ../input/DJGPP/djdev${djver}.zip
 	
-	unzip -q ../input/DJGPP/shl2011br2.zip
-	unzip -q ../input/DJGPP/fil41br2.zip
-	unzip -q ../input/DJGPP/mak421b.zip
+	unzip -qo ../input/DJGPP/shl2011br2.zip
+	unzip -qo ../input/DJGPP/fil41br2.zip
+	unzip -qo ../input/DJGPP/mak421b.zip
+	unzip -qo ../input/DJGPP/pth207b.zip
+
+	unzip -qo ../input/DJGPP/ls080b.zip
 	
-	unzip -q ../input/DJGPP/gdb${gdbver}b.zip
-	unzip -q ../input/DJGPP/bnu${bnuver}b.zip
-	unzip -q ../input/DJGPP/gcc${gccver}b.zip
-	unzip -q ../input/DJGPP/gpp${gccver}b.zip
+	unzip -qo ../input/DJGPP/gdb${gdbver}b.zip
+	unzip -qo ../input/DJGPP/bnu${bnuver}b.zip
+	unzip -qo ../input/DJGPP/gcc${gccver}b.zip
+	unzip -qo ../input/DJGPP/gpp${gccver}b.zip
+	
+	patch -p0 < ../djgpp-fix-pthread.patch
 	;;
 win32)
 	get_mingww64_toolchain 32 i686
@@ -322,8 +382,14 @@ win32-mingworg)
 	download_extract_mingw mpfr-3.1.2-2-mingw32-dll.tar.lzma
 
 	# Add ddraw.h and dinput.h for FB's gfxlib2
-	copyfile "../input/MinGW.org/ddraw.h" "include/ddraw.h"
-	copyfile "../input/MinGW.org/dinput.h" "include/dinput.h"
+
+    # if ddraw.h & dinput.h were added manually:
+	# copyfile "../input/MinGW.org/ddraw.h" "include/ddraw.h"
+	# copyfile "../input/MinGW.org/dinput.h" "include/dinput.h"
+
+	# download link for dx80_mgw.zip from https://liballeg.org/old.html
+	download dx80_mgw.zip https://download.tuxfamily.org/allegro/files/dx80_mgw.zip
+	unzip ../input/dx80_mgw.zip include/ddraw.h include/dinput.h
 
 	# Work around http://sourceforge.net/p/mingw/bugs/2039/
 	patch -p0 < ../mingworg-fix-wcharh.patch
@@ -334,7 +400,7 @@ win64)
 	;;
 esac
 
-bootfb_title=FreeBASIC-1.05.0-$fbtarget
+bootfb_title=FreeBASIC-1.06.0-$fbtarget
 
 case $fbtarget in
 linux*)
@@ -373,6 +439,7 @@ esac
 case $fbtarget in
 win32|win64)
 	# libffi sources
+	# TODO : new libffi package? at https://github.com/libffi/libffi/releases/download/v3.3-rc0/libffi-3.3-rc0.tar.gz
 	libffi_title=libffi-3.2.1
 	libffi_package="${libffi_title}.tar.gz"
 	download "$libffi_package" "ftp://sourceware.org/pub/libffi/$libffi_package"
@@ -401,7 +468,7 @@ echo rebuilding normal fbc:
 cd fbc
 make clean-compiler
 if ERRORLEVEL 1 exit /b
-make
+make FBSHA1=1
 if ERRORLEVEL 1 exit /b
 make install
 if ERRORLEVEL 1 exit /b
@@ -414,7 +481,7 @@ set DJGPP=$dospath/djgpp.env
 set PATH=$dospath/bin
 
 cd fbc
-make ENABLE_STANDALONE=1
+make ENABLE_STANDALONE=1 FBSHA1=1
 if ERRORLEVEL 1 exit /b
 cd ..
 EOF
@@ -422,19 +489,22 @@ EOF
 	cmd /c build.bat
 
 	echo "building standalone fbc:"
-	rm fbc/src/compiler/obj/fbc.o
+	rm fbc/src/compiler/obj/$fbtarget/fbc.o
 	cmd /c buildsa.bat
 
 	mkdir -p fbc/bin/dos
 	cp bin/ar.exe bin/as.exe bin/gdb.exe bin/gprof.exe bin/ld.exe fbc/bin/dos/
+	cp bin/dxe3gen.exe fbc/bin/dos/
 	cp lib/crt0.o lib/gcrt0.o lib/libdbg.a lib/libemu.a lib/libm.a fbc/lib/dos/
 	cp lib/libstdcxx.a fbc/lib/dos/libstdcx.a
 	cp lib/libsupcxx.a fbc/lib/dos/libsupcx.a
+	cp lib/libsocket.a fbc/lib/dos/libsocket.a
+	cp lib/libpthread.a fbc/lib/dos/libpthread.a
 	cp lib/gcc/djgpp/$djgppgccversiondir/libgcc.a fbc/lib/dos/
 
 	cd fbc
-	make bindist TARGET_OS=dos DISABLE_DOCS=1
-	make bindist TARGET_OS=dos ENABLE_STANDALONE=1
+	make bindist TARGET_OS=dos DISABLE_DOCS=1 FBSHA1=1
+	make bindist TARGET_OS=dos ENABLE_STANDALONE=1 FBSHA1=1
 	cd ..
 
 	cp fbc/*.zip ../output
@@ -456,16 +526,39 @@ linuxbuild() {
 	make FBC=../tempinstall/bin/fbc
 	cd ..
 
-	cd fbc && make bindist && cd ..
+	cd fbc && make bindist FBSHA1=1 && cd ..
 	cp fbc/*.tar.* ../output
 	cp fbc/contrib/manifest/FreeBASIC-$fbtarget.lst ../output
 }
 
-windowsbuild() {
-	# Add our toolchain's bin/ to the PATH, so hopefully we'll only use
-	# its gcc and not one from the host
-	origPATH="$PATH"
-	export PATH="$PWD/bin:$PATH"
+libffibuild() {
+
+	# do we already have the files we need?
+	if [ -f "../input/$libffi_title/$target$recipe/ffi.h" ]; then
+	if [ -f "../input/$libffi_title/$target$recipe/ffitarget.h" ]; then
+	if [ -f "../input/$libffi_title/$target$recipe/libffi.a" ]; then
+		echo
+		echo "using cached libffi: $libffi_title/$target$recipe"
+		echo
+		return
+	fi
+	fi
+	fi
+
+	# just grab the files we need from the package?
+	# TODO : maybe once libffi 3.3 is released, we can go back
+	# to building libffi ourselves.
+
+	# copy files from opt/lib/libffi-3.2.1
+	case "$recipe" in
+	-gcc-7.1.0|-gcc-7.1.0r0|-gcc-7.1.0r2|-gcc-7.3.0|-gcc-8.1.0)
+		mkdir -p ../input/$libffi_title/$target$recipe
+		cp opt/lib/libffi-3.2.1/include/ffi.h       ../input/$libffi_title/$target$recipe
+		cp opt/lib/libffi-3.2.1/include/ffitarget.h ../input/$libffi_title/$target$recipe
+		cp opt/lib/libffi.a                         ../input/$libffi_title/$target$recipe
+		return
+		;;
+	esac
 
 	echo
 	echo "building libffi"
@@ -475,16 +568,33 @@ windowsbuild() {
 	cd "$libffi_build"
 	if [ "$target" = win64 ]; then
 		CFLAGS=-O2 ../$libffi_title/configure --disable-shared --enable-static --build=x86_64-w64-mingw32 --host=x86_64-w64-mingw32
+	elif [ "$target" = win32 ]; then
+		# force host even for 32-bit, we might be cross compiling from x86_64 to x86
+		CFLAGS=-O2 ../$libffi_title/configure --disable-shared --enable-static --host=i686-w64-mingw32
 	else
 		CFLAGS=-O2 ../$libffi_title/configure --disable-shared --enable-static
 	fi
 	make
-	case "$target" in
-	win32)		cp include/ffi.h include/ffitarget.h ../i686-w64-mingw32/include;;
-	win32-mingworg)	cp include/ffi.h include/ffitarget.h ../include;;
-	win64)		cp include/ffi.h include/ffitarget.h ../x86_64-w64-mingw32/include;;
-	esac
+	# stash some files in the input folder to make rebuilding faster
+	mkdir -p ../../input/$libffi_title/$target$recipe
+	cp include/ffi.h include/ffitarget.h ../../input/$libffi_title/$target$recipe
+	cp .libs/libffi.a ../../input/$libffi_title/$target$recipe
 	cd ..
+}
+
+windowsbuild() {
+	# Add our toolchain's bin/ to the PATH, so hopefully we'll only use
+	# its gcc and not one from the host
+	origPATH="$PATH"
+	export PATH="$PWD/bin:$PATH"
+
+	libffibuild
+	# copy our stored files to the build
+	case "$target" in
+	win32)          cp ../input/$libffi_title/$target$recipe/ffi.h ../input/$libffi_title/$target$recipe/ffitarget.h ./i686-w64-mingw32/include;;
+	win32-mingworg) cp ../input/$libffi_title/$target$recipe/ffi.h ../input/$libffi_title/$target$recipe/ffitarget.h ./include;;
+	win64)          cp ../input/$libffi_title/$target$recipe/ffi.h ../input/$libffi_title/$target$recipe/ffitarget.h ./x86_64-w64-mingw32/include;;
+	esac
 
 	cd fbc
 	echo
@@ -496,15 +606,15 @@ windowsbuild() {
 	echo "rebuilding normal fbc"
 	echo
 	make clean-compiler
-	make
+	make FBSHA1=1
 	cd ..
 
 	cd fbc
 	echo
 	echo "building standalone fbc"
 	echo
-	rm src/compiler/obj/fbc.o
-	make ENABLE_STANDALONE=1
+	rm src/compiler/obj/$fbtarget/fbc.o
+	make ENABLE_STANDALONE=1 FBSHA1=1
 	cd ..
 
 	mkdir -p fbc/bin/$fbtarget
@@ -540,30 +650,33 @@ windowsbuild() {
 		;;
 	esac
 
-	# TODO: GoRC.exe should really be taken from its homepage
-	# <http://www.godevtool.com/>, but it was offline today
-	cp $bootfb_title/bin/$fbtarget/GoRC.exe		fbc/bin/$fbtarget
-
-	cp "$libffi_build"/.libs/libffi.a	fbc/lib/$fbtarget
+	cp ../input/$libffi_title/$target$recipe/libffi.a fbc/lib/$fbtarget
 
 	# Reduce .exe sizes by dropping debug info
 	# (this was at least needed for MinGW.org's gdb, and probably nothing else,
 	# but it shouldn't hurt either)
 	strip -g fbc/bin/$fbtarget/*
 
+	# get GoRC.exe from author site
+	download "Gorc.zip" "http://www.godevtool.com/Gorc.zip"
+	unzip ../input/Gorc.zip GoRC.exe -d fbc/bin/$fbtarget
+
 	cd fbc
 	case "$target" in
 	win32|win64)
-		make bindist DISABLE_DOCS=1
-		make bindist ENABLE_STANDALONE=1
+		make bindist DISABLE_DOCS=1 FBPACKSUFFIX=$recipe FBSHA1=1
+		make bindist ENABLE_STANDALONE=1 FBPACKSUFFIX=$recipe FBSHA1=1
 		;;
 	win32-mingworg)
-		make bindist DISABLE_DOCS=1 FBPACKSUFFIX=-mingworg
-		make bindist ENABLE_STANDALONE=1 FBPACKSUFFIX=-mingworg
+		make bindist DISABLE_DOCS=1 FBPACKSUFFIX=-mingworg FBSHA1=1
+		make bindist ENABLE_STANDALONE=1 FBPACKSUFFIX=-mingworg FBSHA1=1
 		;;
 	esac
 	cd ..
 
+	# Only build the installer, if we are also
+	# building the default package
+	if [ -z "$recipe" ]; then
 	if [ "$target" = win32 ]; then
 		cd fbc/contrib/nsis-installer
 		cp ../../FreeBASIC-*-win32.zip .
@@ -571,10 +684,11 @@ windowsbuild() {
 		cd ../../..
 		cp fbc/contrib/nsis-installer/FreeBASIC-*-win32.exe ../output
 	fi
+	fi
 
 	cp fbc/*.zip fbc/*.7z ../output
-	cp fbc/contrib/manifest/fbc-$target.lst		../output
-	cp fbc/contrib/manifest/FreeBASIC-$target.lst	../output
+	cp fbc/contrib/manifest/fbc-$target$recipe.lst       ../output
+	cp fbc/contrib/manifest/FreeBASIC-$target$recipe.lst ../output
 
 	export PATH="$origPATH"
 	cd ..

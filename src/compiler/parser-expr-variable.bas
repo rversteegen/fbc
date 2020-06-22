@@ -83,7 +83,7 @@ private function cFixedSizeArrayIndex( byval sym as FBSYMBOL ptr ) as ASTNODE pt
 		dimexpr = hCheckIntegerIndex( hIndexExpr( ) )
 
 		'' bounds checking
-		if( env.clopt.extraerrchk ) then
+		if( env.clopt.arrayboundchk ) then
 			dimexpr = astBuildBOUNDCHK( dimexpr, astNewCONSTi( lower ), astNewCONSTi( upper ) )
 			if( dimexpr = NULL ) then
 				errReport( FB_ERRMSG_ARRAYOUTOFBOUNDS )
@@ -179,7 +179,7 @@ private function hFieldAccess _
 			'' Dynamic array field; access the descriptor field (same offset)
 			desc = symbGetArrayDescriptor( fld )
 			varexpr = astNewBOP( AST_OP_ADD, varexpr, offsetexpr )
-			varexpr = astNewCONV( typeAddrOf( symbGetFullType( desc ) ), symbGetSubtype( desc ), varexpr, AST_CONVOPT_DONTCHKPTR )
+			varexpr = astNewCONV( typeAddrOf( symbGetFullType( desc ) ), symbGetSubtype( desc ), varexpr, AST_CONVOPT_DONTCHKPTR or AST_CONVOPT_DONTWARNCONST )
 
 			tree = NULL
 			if( astHasSideFx( varexpr ) ) then
@@ -190,7 +190,7 @@ private function hFieldAccess _
 
 			'' *cptr( dtype ptr, var->descriptor.data + index )
 			varexpr = astNewBOP( AST_OP_ADD, varexpr, astNewCONSTi( symb.fbarray_data ) )
-			varexpr = astNewCONV( typeMultAddrOf( dtype, 2 ), subtype, varexpr, AST_CONVOPT_DONTCHKPTR )
+			varexpr = astNewCONV( typeMultAddrOf( dtype, 2 ), subtype, varexpr, AST_CONVOPT_DONTCHKPTR or AST_CONVOPT_DONTWARNCONST )
 			varexpr = astNewDEREF( varexpr )
 			varexpr = astNewBOP( AST_OP_ADD, varexpr, indexexpr )
 			varexpr = astNewDEREF( varexpr )
@@ -407,6 +407,51 @@ function cUdtMember _
 end function
 
 '':::::
+'' UdtTypeMember       =   ('.' MemberId)*
+''
+sub cUdtTypeMember _
+	( _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr, _
+		byref lgt as longint, _
+		byref is_fixlenstr as integer _
+	)
+
+	'' UDT type followed by '.'?
+	while( lexGetToken( ) = CHAR_DOT )
+		if( typeGetDtOnly( dtype ) <> FB_DATATYPE_STRUCT ) then
+			exit while
+		end if
+
+		lexSkipToken( LEXCHECK_NOPERIOD )
+
+		'' check member field, See also hLenSizeof()
+		dim sym as FBSYMBOL ptr = hMemberId( subtype )
+
+		if( sym ) then
+			lexSkipToken( )
+			dtype = symbGetFullType( sym )
+			subtype = symbGetSubType( sym )
+			lgt = symbGetLen( sym )
+			is_fixlenstr = symbGetIsFixLenStr( sym )
+
+			'' const string? get the size from the constant string value
+			if( symbGetClass( sym ) = FB_SYMBCLASS_CONST ) then
+				select case( typeGetDtAndPtrOnly( dtype ) )
+				case FB_DATATYPE_WCHAR, FB_DATATYPE_CHAR, FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR
+					is_fixlenstr = TRUE
+					lgt = symbGetLen( symbGetConstStr( sym ) )
+					exit while
+				end select
+			end if
+		else
+			exit while
+
+		end if
+	wend
+end sub
+
+'':::::
 function cMemberAccess _
 	( _
 		byval dtype as integer, _
@@ -457,7 +502,7 @@ private function hStrIndexing _
 	end if
 
 	'' null pointer checking
-	if( env.clopt.extraerrchk ) then
+	if( env.clopt.arrayboundchk ) then
 		varexpr = astBuildPTRCHK( varexpr )
 	end if
 
@@ -530,7 +575,7 @@ function cMemberDeref _
 					subtype = NULL
 				end select
 
-				if( env.clopt.extraerrchk ) then
+				if( env.clopt.nullptrchk ) then
 					varexpr = astBuildPTRCHK( varexpr )
 				end if
 
@@ -685,7 +730,7 @@ function cMemberDeref _
 				idxexpr = hCheckIntegerIndex( idxexpr )
 
 				'' null pointer checking
-				if( env.clopt.extraerrchk ) then
+				if( env.clopt.nullptrchk ) then
 					varexpr = astBuildPTRCHK( varexpr )
 				end if
 
@@ -770,7 +815,7 @@ function cFuncPtrOrMemberDeref _
 	end if
 
 	'' null pointer checking
-	if( env.clopt.extraerrchk ) then
+	if( env.clopt.nullptrchk ) then
 		expr = astBuildPTRCHK( expr )
 	end if
 
@@ -819,7 +864,7 @@ private function cDynamicArrayIndex _
 		dimexpr = hCheckIntegerIndex( hIndexExpr( ) )
 
 		'' bounds checking
-		if( env.clopt.extraerrchk ) then
+		if( env.clopt.arrayboundchk ) then
 			dimexpr = astBuildBOUNDCHK( dimexpr, _
 					astBuildDerefAddrOf( astCloneTree( descexpr ), dimoffset + symb.fbarraydim_lbound, FB_DATATYPE_INTEGER, NULL ), _
 					astBuildDerefAddrOf( astCloneTree( descexpr ), dimoffset + symb.fbarraydim_ubound, FB_DATATYPE_INTEGER, NULL ) )

@@ -33,6 +33,9 @@ const GFXDRIVER *__fb_gfx_drivers_list[] = {
 	&fb_gfxDriverDirectDraw,
 #endif
 	&fb_gfxDriverGDI,
+#ifndef HOST_CYGWIN
+	&fb_gfxDriverD2D,
+#endif
 	&fb_gfxDriverOpenGL,
 	NULL
 };
@@ -89,8 +92,13 @@ static void fb_hSetMouseClip( void )
 	ClipCursor(&rc);
 }
 
-static void ToggleFullScreen( void )
+static void ToggleFullScreen( EVENT *e )
 {
+	if (has_focus) {
+		e->type = EVENT_MOUSE_EXIT;
+		fb_hPostEvent(e);
+	}
+
 	if (fb_win32.flags & DRIVER_NO_SWITCH)
 		return;
 
@@ -112,7 +120,16 @@ static void ToggleFullScreen( void )
 	has_focus = FALSE;
 }
 
-static VOID CALLBACK fb_hTrackMouseTimerProc(HWND hWnd, UINT uMsg, UINT idEvent, DWORD dwTime)
+static VOID CALLBACK fb_hTrackMouseTimerProc(
+	HWND hWnd, 
+	UINT uMsg,
+#if _WIN64 
+	UINT_PTR idEvent, 
+#else
+	UINT idEvent,
+#endif
+	DWORD dwTime
+)
 {
 	POINT pt, rect_pt[2];
 	RECT *rect = (RECT *)rect_pt;
@@ -129,7 +146,7 @@ static VOID CALLBACK fb_hTrackMouseTimerProc(HWND hWnd, UINT uMsg, UINT idEvent,
 static BOOL WINAPI fb_hTrackMouseEvent(TRACKMOUSEEVENT *e)
 {
 	if (e->dwFlags == TME_LEAVE)
-		return SetTimer(e->hwndTrack, e->dwFlags, 100, (TIMERPROC)fb_hTrackMouseTimerProc);
+		return SetTimer(e->hwndTrack, e->dwFlags, 100, fb_hTrackMouseTimerProc);
 	return FALSE;
 }
 
@@ -322,24 +339,22 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			break;
 
 		case WM_SIZE:
-		case WM_SYSKEYDOWN:
-			if (!fb_win32.is_active)
-				break;
-
-			{
-				int is_alt_enter = ((message == WM_SYSKEYDOWN) && (wParam == VK_RETURN) && (lParam & 0x20000000));
-				int is_maximize = ((message == WM_SIZE) && (wParam == SIZE_MAXIMIZED));
-				if ( is_maximize || is_alt_enter) {
-					if (has_focus) {
-						e.type = EVENT_MOUSE_EXIT;
-						fb_hPostEvent(&e);
-					}
-					ToggleFullScreen();
+			if (fb_win32.is_active) {
+				if ( wParam == SIZE_MAXIMIZED ) {
+					ToggleFullScreen(&e);
 					return FALSE;
 				}
-				if( message!=WM_SYSKEYDOWN )
-					break;
 			}
+			break;
+
+		case WM_SYSKEYDOWN:
+			if (fb_win32.is_active) {
+				if ( (wParam == VK_RETURN) && (lParam & 0x20000000) ) {
+					ToggleFullScreen(&e);
+					return FALSE;
+				}
+			}
+			/* fall through */
 
 		case WM_KEYDOWN:
 		case WM_KEYUP:
@@ -435,9 +450,26 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			return FALSE;
 
 		case WM_PAINT:
-			BeginPaint(fb_win32.wnd, &ps);
-			fb_win32.paint();
-			EndPaint(fb_win32.wnd, &ps);
+			{
+				/* set the rows in __fb_gfx->dirty corresponding to the 
+				// window update rect as dirty
+				 */
+				LONG dirtyStartLine, numLines;
+				int scanlineShift = __fb_gfx->scanline_size - 1;
+
+				BeginPaint(fb_win32.wnd, &ps);
+				dirtyStartLine = ps.rcPaint.top;
+				numLines = ps.rcPaint.bottom - dirtyStartLine;
+
+				DBG_ASSERT(scanlineShift == 0 || scanlineShift == 1);
+				dirtyStartLine >>= scanlineShift;
+				numLines = max(numLines >> scanlineShift, 1);
+
+				fb_hMemSet(__fb_gfx->dirty + dirtyStartLine, TRUE, numLines);
+
+				fb_win32.paint();
+				EndPaint(fb_win32.wnd, &ps);
+			}
 			break;
 		
 		case WM_DISPLAYCHANGE:

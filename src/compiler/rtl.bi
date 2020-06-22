@@ -248,6 +248,7 @@
 #define FB_RTL_MEMCOPY 					"fb_MemCopy"
 #define FB_RTL_MEMSWAP 					"fb_MemSwap"
 #define FB_RTL_MEMCOPYCLEAR 			"fb_MemCopyClear"
+#define FB_RTL_MEMMOVE					"fb_MemMove"
 
 #define FB_RTL_FILEOPEN 				"fb_FileOpen"
 #define FB_RTL_FILEOPEN_ENCOD			"fb_FileOpenEncod"
@@ -657,6 +658,7 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_MEMCOPY
 	FB_RTL_IDX_MEMSWAP
 	FB_RTL_IDX_MEMCOPYCLEAR
+	FB_RTL_IDX_MEMMOVE
 	FB_RTL_IDX_ALLOCATE
 	FB_RTL_IDX_DEALLOCATE
 
@@ -817,27 +819,27 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_FTOUL
 	FB_RTL_IDX_DTOUL
 
-    FB_RTL_IDX_THREADCALL
+	FB_RTL_IDX_THREADCALL
 
 	FB_RTL_INDEXES
 end enum
 
 enum FB_RTL_OPT
-	FB_RTL_OPT_NONE		  = &h00000000
-	FB_RTL_OPT_OVER		  = &h00000001					'' overloaded
-	FB_RTL_OPT_ERROR	  = &h00000002					'' returns an error
-	FB_RTL_OPT_MT		  = &h00000004					'' needs the multithreaded rtlib
+	FB_RTL_OPT_NONE           = &h00000000
+	FB_RTL_OPT_OVER           = &h00000001  '' overloaded
+	FB_RTL_OPT_ERROR          = &h00000002  '' returns an error
+	FB_RTL_OPT_MT             = &h00000004  '' needs the multithreaded rtlib
 
-	FB_RTL_OPT_DBGONLY	  = &h00000010                  '' Debug-build only (assertions/__FB_DEBUG__)
-				''= &h00000020
-	FB_RTL_OPT_STRSUFFIX  = &h00000040                  '' has a $ suffix (-lang qb only)
-	FB_RTL_OPT_NOQB		  = &h00000080                  '' anything but -lang qb
-	FB_RTL_OPT_QBONLY	  = &h00000100                  '' -lang qb only
-	FB_RTL_OPT_NOFB		  = &h00000200                  '' anything but -lang fb
-	FB_RTL_OPT_FBONLY	  = &h00000400                  ''
+	FB_RTL_OPT_ASSERTONLY     = &h00000010  '' only if asserts are enabled
+	''                        = &h00000020
+	FB_RTL_OPT_STRSUFFIX      = &h00000040  '' has a $ suffix (-lang qb only)
+	FB_RTL_OPT_NOQB           = &h00000080  '' anything but -lang qb
+	FB_RTL_OPT_QBONLY         = &h00000100  '' -lang qb only
+	FB_RTL_OPT_NOFB           = &h00000200  '' anything but -lang fb
+	FB_RTL_OPT_FBONLY         = &h00000400  ''
 	FB_RTL_OPT_CANBECLONED    = &h00000800  '' -> FB_PROCSTATS_CANBECLONED
-	                          ''&h00001000
-	FB_RTL_OPT_NOGCC	  = &h00002000                  '' anything but -gen gcc
+	''                        = &h00001000
+	FB_RTL_OPT_NOGCC          = &h00002000  '' anything but -gen gcc
 	FB_RTL_OPT_X86ONLY        = &h00004000  '' on x86 only
 	FB_RTL_OPT_32BIT          = &h00008000  '' 32bit only
 	FB_RTL_OPT_64BIT          = &h00010000  '' 64bit only
@@ -866,7 +868,7 @@ type FB_RTL_PARAMDEF
 	mode		as FB_PARAMMODE
 	isopt		as integer
 	optval		as integer
-	check_const as integer
+	check_const as integer   '' !!! TODO !!! remove, this is never used
 end type
 
 type FB_RTL_PROCDEF

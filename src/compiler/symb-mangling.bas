@@ -104,13 +104,13 @@ function symbGetDBGName( byval sym as FBSYMBOL ptr ) as zstring ptr
 		case FB_SYMBCLASS_ENUM, FB_SYMBCLASS_STRUCT, _
 			 FB_SYMBCLASS_CLASS, FB_SYMBCLASS_NAMESPACE
 
-    		'' check if an alias wasn't given
-    		dim as zstring ptr res = sym->id.alias
-    		if( res = NULL ) then
-    			res = sym->id.name
-    		end if
+			'' check if an alias wasn't given
+			dim as zstring ptr res = sym->id.alias
+			if( res = NULL ) then
+				res = sym->id.name
+			end if
 
-    		return res
+			return res
 
 		case else
 			return symbGetMangledName( sym )
@@ -183,7 +183,7 @@ private sub hMangleUdtId( byref mangled as string, byval sym as FBSYMBOL ptr )
 		mangled += "I" '' begin of template argument list
 
 		symbGetDescTypeArrayDtype( sym, arraydtype, arraysubtype )
-		symbMangleType( mangled, arraydtype, arraysubtype )
+		symbMangleType( mangled, arraydtype, arraysubtype, FB_MANGLEOPT_KEEPTOPCONST )
 
 		mangled += "E" '' end of template argument list
 	end if
@@ -357,7 +357,7 @@ function hMangleBuiltInType _
 	''    64bit fbc it was reversed, allowing the same FB and C++ code to work
 	''    together on both 32bit and 64bit.
 	''
-	''  - as special expection for windows 64bit, to get a 32bit type that will
+	''  - as special exception for windows 64bit, to get a 32bit type that will
 	''    mangle to C++ long, allow 'as [u]long alias "[u]long"' declarations.
 	''    The size of LONG/ULONG does not change, it's 32bit, only the mangling,
 	''    so fbc programs can call C++ code requiring 'long int' arguments.
@@ -390,6 +390,11 @@ function hMangleBuiltInType _
 		end select
 	end if
 
+	'' Still have a mangle data type? remap.
+	if( typeHasMangleDt( dtype ) ) then
+		dtype = typeGetMangleDt( dtype )
+	end if
+
 	'' dtype should be a FB_DATATYPE by now
 	assert( dtype = typeGetDtOnly( dtype ) )
 
@@ -414,6 +419,7 @@ function hMangleBuiltInType _
 		@"d", _ '' double
 		NULL, _ '' var-len string
 		NULL, _ '' fix-len string
+		@"c", _ '' va_list
 		NULL, _ '' struct
 		NULL, _ '' namespace
 		NULL, _ '' function
@@ -429,7 +435,8 @@ sub symbMangleType _
 	( _
 		byref mangled as string, _
 		byval dtype as integer, _
-		byval subtype as FBSYMBOL ptr _
+		byval subtype as FBSYMBOL ptr, _
+		byval options as FB_MANGLEOPT = FB_MANGLEOPT_NONE _
 	)
 
 	dim as FBSYMBOL ptr ns = any
@@ -453,36 +460,18 @@ sub symbMangleType _
 
 	'' reference?
 	if( typeIsRef( dtype ) ) then
-		'' const?
-		if( typeIsConst( dtype ) ) then
-			mangled += "RK"
-		else
-			mangled + = "R"
-		end if
+		mangled += "R"
 
-		symbMangleType( mangled, typeUnsetIsRef( dtype ), subtype )
-
-		hAbbrevAdd( dtype, subtype )
-		exit sub
-	end if
-
-	'' pointer? (must be checked/emitted before CONST)
-	if( typeIsPtr( dtype ) ) then
-		'' const?
-		if( typeIsConstAt( dtype, 1 ) ) then
-			mangled += "PK"
-		else
-			mangled += "P"
-		end if
-
-		symbMangleType( mangled, typeDeref( dtype ), subtype )
+		symbMangleType( mangled, typeUnsetIsRef( dtype ), subtype, _
+			options or FB_MANGLEOPT_HASREF or FB_MANGLEOPT_KEEPTOPCONST)
 
 		hAbbrevAdd( dtype, subtype )
 		exit sub
 	end if
 
 	'' const?
-	if( typeGetConstMask( dtype ) ) then
+	if( typeIsConst( dtype ) ) then
+
 		'' The type has some CONST bits. For C++ mangling we remove the
 		'' toplevel one and recursively mangle the rest of the type.
 		''
@@ -491,10 +480,51 @@ sub symbMangleType _
 		'' difference. It's not allowed to have overloads that differ
 		'' only in BYVAL CONSTness. The CONST only matters if it's a
 		'' pointer or BYREF type.
-		symbMangleType( mangled, typeUnsetIsConst( dtype ), subtype )
+
+		if( (options and FB_MANGLEOPT_KEEPTOPCONST) <> 0 ) then
+			mangled += "K"
+		end if
+
+		symbMangleType( mangled, typeUnsetIsConst( dtype ), subtype, _
+			options and not FB_MANGLEOPT_KEEPTOPCONST )
 
 		hAbbrevAdd( dtype, subtype )
 		exit sub
+	end if
+
+	'' pointer?
+	if( typeIsPtr( dtype ) ) then
+		mangled += "P"
+
+		symbMangleType( mangled, typeDeref( dtype ), subtype, _
+			options or FB_MANGLEOPT_HASPTR or FB_MANGLEOPT_KEEPTOPCONST )
+
+		hAbbrevAdd( dtype, subtype )
+		exit sub
+	end if
+
+	'' struct with __builtin_va_list mangle modifier?
+	'' use the stuct name instead
+	if( typeHasMangleDt( dtype ) ) then
+		if( typeGetDtOnly( dtype ) = FB_DATATYPE_STRUCT ) then
+			if( typeGetMangleDt( dtype ) = FB_DATATYPE_VA_LIST ) then
+
+				'' if the type was passed as byval ptr or byref
+				'' need to mangle in "A1_" to indicate the array type, but
+				'' not on aarch64, __va_list is a plain struct, it doesn't
+				'' need the array type specifier.
+
+				if( symbIsValistStructArray( dtype, subtype ) ) then
+					if( (options and (FB_MANGLEOPT_HASREF or FB_MANGLEOPT_HASPTR)) <> 0 ) then
+						mangled += "A1_"
+					else
+						mangled += "P"
+					end if
+				end if
+
+				dtype = typeSetMangleDt( dtype, 0 )
+			end if
+		end if
 	end if
 
 	''
@@ -573,7 +603,7 @@ sub symbMangleParam( byref mangled as string, byval param as FBSYMBOL ptr )
 		'' Mangling array params as 'FBARRAY[1-8]<dtype>&' because
 		'' that's what they really are from C++'s point of view.
 		assert( symbIsDescriptor( param->param.bydescrealsubtype ) )
-		symbMangleType( mangled, typeSetIsRef( FB_DATATYPE_STRUCT ), param->param.bydescrealsubtype )
+		symbMangleType( mangled, typeSetIsRef( FB_DATATYPE_STRUCT ), param->param.bydescrealsubtype, FB_MANGLEOPT_KEEPTOPCONST )
 
 	case FB_PARAMMODE_VARARG
 		mangled += "z"
@@ -591,28 +621,28 @@ private function hAddUnderscore( ) as integer
 end function
 
 private function hDoCppMangling( byval sym as FBSYMBOL ptr ) as integer
-    '' C++?
-    if( symbGetMangling( sym ) = FB_MANGLING_CPP ) then
-    	return TRUE
-    end if
+	'' C++?
+	if( symbGetMangling( sym ) = FB_MANGLING_CPP ) then
+		return TRUE
+	end if
 
-    '' RTL or exclude parent?
-    if( (symbGetStats( sym ) and (FB_SYMBSTATS_RTL or _
-    							  FB_SYMBSTATS_EXCLPARENT)) <> 0 ) then
-    	return FALSE
-    end if
+	'' RTL or exclude parent?
+	if( ( (symbGetStats( sym ) and (FB_SYMBSTATS_RTL or FB_SYMBSTATS_EXCLPARENT)) <> 0 ) _
+		or ( symbGetMangling( sym ) = FB_MANGLING_RTLIB ) ) then
+		return FALSE
+	end if
 
-    '' inside a namespace or class?
-    if( symbGetNamespace( sym ) <> @symbGetGlobalNamespc( ) ) then
-    	return TRUE
-    end if
+	'' inside a namespace or class?
+	if( symbGetNamespace( sym ) <> @symbGetGlobalNamespc( ) ) then
+		return TRUE
+	end if
 
-    if( sym->class = FB_SYMBCLASS_PROC ) then
-    	'' overloaded? (this will handle operators too)
-    	if( symbIsOverloaded( sym ) ) then
+	if( sym->class = FB_SYMBCLASS_PROC ) then
+		'' overloaded? (this will handle operators too)
+		if( symbIsOverloaded( sym ) ) then
     		return TRUE
-    	end if
-    end if
+		end if
+	end if
 
 	function = FALSE
 end function
@@ -1165,7 +1195,8 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 	end if
 
 	'' C++ prefix
-	if( docpp ) then
+	'' global overloaded operators need the prefix
+	if( docpp or symbIsOperator( sym ) ) then
 		mangled += "_Z"
 	end if
 

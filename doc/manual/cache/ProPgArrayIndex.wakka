@@ -94,11 +94,12 @@ END SUB
 %%
 
 {{fbdoc item="see"}}
-	- [[ProPgArrays|Arrays]]
+	- [[ProPgArrays|Arrays Overview]]
 	- ##[[KeyPgDim|Dim]]##
 	- ##[[KeyPgFunction|Function]]##
 	- ##[[KeyPgSub|Sub]]##
 	- [[ProPgVariables|Variables]] 
 	- [[ProPgVariableScope|Variable Scope]]
+	- ##[[TblVarTypes|Standard Data Type Limits]]##
 
 {{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}

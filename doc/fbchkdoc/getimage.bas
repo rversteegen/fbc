@@ -1,5 +1,5 @@
 ''  fbchkdoc - FreeBASIC Wiki Management Tools
-''	Copyright (C) 2008-2018 Jeffery R. Marshall (coder[at]execulink[dot]com)
+''	Copyright (C) 2008-2019 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -165,7 +165,8 @@ if( app_opt.help ) then
 end if
 
 cmd_opts_resolve()
-cmd_opts_check()
+cmd_opts_check_cache()
+cmd_opts_check_url()
 
 '' --------------------------------------------------------
 

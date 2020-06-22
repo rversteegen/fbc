@@ -74,7 +74,10 @@ private function hLen _
 		end if
 
 		'' String literal, evaluate at compile-time
-		lgt = symbGetWstrLen( litsym ) - 1
+		'' symbGetStrLen( litsym ) will return the number of codepoints
+		'' that are used to store the escaped WSTRING literal, when what
+		'' we really want is the number od codepoints unescaped.
+		lgt = len( *hUnescapeW( symbGetVarLitTextW( litsym ) ) )
 
 	case FB_DATATYPE_FIXSTR
 		'' len( fixstr ) returns the N from STRING * N, i.e. it works
@@ -123,6 +126,27 @@ private function hLenSizeof( byval tk as integer, byval isasm as integer ) as AS
 		if( astIsNIDXARRAY( expr ) ) then
 			tk = FB_TK_SIZEOF
 			expr = astRemoveNIDXARRAY( expr )
+		end if
+
+	'' then must be a type
+	elseif( tk = FB_TK_SIZEOF ) then
+		dim is_fixlenstr as integer
+		cUdtTypeMember( dtype, subtype, lgt, is_fixlenstr )
+
+	elseif( tk = FB_TK_LEN ) then
+		dim is_fixlenstr as integer
+		cUdtTypeMember( dtype, subtype, lgt, is_fixlenstr )
+
+		if( is_fixlenstr ) then
+			'' assume that constant string has no embedded nulls
+			select case typeGetDtAndPtrOnly( dtype )
+			case FB_DATATYPE_CHAR, FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR
+				lgt -= typeGetSize( FB_DATATYPE_CHAR )
+				lgt /= typeGetSize( FB_DATATYPE_CHAR )
+			case FB_DATATYPE_WCHAR
+				lgt -= typeGetSize( FB_DATATYPE_WCHAR )
+				lgt /= typeGetSize( FB_DATATYPE_WCHAR )
+			end select
 		end if
 	end if
 

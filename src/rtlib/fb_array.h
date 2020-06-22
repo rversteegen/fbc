@@ -4,12 +4,20 @@ typedef struct _FBARRAYDIM {
 	ssize_t ubound;
 } FBARRAYDIM;
 
+typedef enum _FBARRAY_FLAGS {
+	FBARRAY_FLAGS_DIMENSIONS = 0x0000000f,
+	FBARRAY_FLAGS_FIXED_DIM  = 0x00000010,
+	FBARRAY_FLAGS_FIXED_LEN  = 0x00000020,
+	FBARRAY_FLAGS_RESERVED   = 0xffffffc0
+} FBARRAY_FLAGS;
+
 typedef struct _FBARRAY {
 	void           *data;        /* ptr + diff, must be at ofs 0! */
 	void           *ptr;
 	size_t          size;
 	size_t          element_len;
 	size_t          dimensions;
+	size_t          flags;       /* FBARRAY_FLAGS */
 	FBARRAYDIM      dimTB[1];    /* dimtb[dimensions] */
 } FBARRAY;
 
@@ -51,6 +59,7 @@ FBCALL int        fb_ArrayClear        ( FBARRAY *array, int isvarlen );
 FBCALL int        fb_ArrayClearObj     ( FBARRAY *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor, int dofill );
 FBCALL int        fb_ArrayErase        ( FBARRAY *array, int isvarlen );
 FBCALL int        fb_ArrayEraseObj     ( FBARRAY *array, FB_DEFCTOR dtor );
+FBCALL FBARRAY   *fb_ArrayGetDesc      ( FBARRAY *array );
 FBCALL void       fb_ArrayStrErase     ( FBARRAY *array );
        int        fb_ArrayRedim        ( FBARRAY *array, size_t element_len, int preserve, size_t dimensions, ... );
        int        fb_ArrayRedimEx      ( FBARRAY *array, size_t element_len, int doclear, int isvarlen, size_t dimensions, ... );

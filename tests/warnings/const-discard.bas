@@ -1014,3 +1014,98 @@ scope
 	WARN(0)
 	memcpy( x + i, xc, 5 )
 end scope
+
+'' --------------------------------------------------------
+
+'' from https://www.freebasic.net/forum/viewtopic.php?p=254288#p254288
+
+#print "---- Array in Const UDT"
+
+type point
+	x as single
+	y as single
+end type
+
+type shape
+	points(any) as point
+end type
+
+sub const_udt_array( byref s as const shape )
+	WARN(0)
+	print lbound(s.points)
+	WARN(0)
+	print ubound(s.points)
+	WARN(0)
+	print @s.points(0)
+	WARN(0)
+	print s.points(0).x
+end sub
+
+'' --------------------------------------------------------
+
+'' from https://www.freebasic.net/forum/viewtopic.php?f=17&t=27692
+'' and  https://sourceforge.net/p/fbc/bugs/910/
+
+#print "---- Regression Checks"
+
+sub const_cast_string1( byval s as string )
+end sub 
+sub const_cast_string2( byref s as const string )
+	WARN(1)
+    const_cast_string1( cast(string, s) )
+end sub
+
+scope
+	dim x as const string = "test"
+	dim y as string
+	WARN(1)
+	y = cast(string, x )
+	WARN(0)
+	y = cast(const string, x )
+end scope
+
+type T_integer
+	__ as integer
+end type
+
+sub const_cast_proc1i( byval i as integer ptr )
+end sub 
+sub const_cast_proc2i( byval i as const integer ptr )
+end sub
+
+sub const_cast_proc1t( byval x as T_integer ptr )
+end sub 
+sub const_cast_proc2t( byval x as const T_integer ptr )
+end sub 
+
+scope
+	dim i as const integer = 1
+	WARN(1)
+	const_cast_proc1i( @cast(integer, i) )
+	WARN(0)
+	const_cast_proc2i( @cast(const integer, i) )
+end scope
+
+scope
+	dim i as integer = 1
+	WARN(1)
+	const_cast_proc2i( @cast(const integer, i) )
+	WARN(0)
+	const_cast_proc2i( @cast(integer, i) )
+end scope
+
+scope
+	dim x as const T_integer = ( 1 )
+	WARN(1)
+	const_cast_proc1t( @cast(T_integer, x) )
+	WARN(0)
+	const_cast_proc2t( @cast(const T_integer, x) )
+end scope
+
+scope
+	dim x as T_integer = ( 1 )
+	WARN(1)
+	const_cast_proc2t( @cast(const T_integer,x) )
+	WARN(0)
+	const_cast_proc2t( @cast(T_integer,x) )
+end scope

@@ -1,6 +1,12 @@
 # include "fbcunit.bi"
 
-#if __FB_BACKEND__ = "gas"
+#if (__FB_BACKEND__ = "gas")
+	#define DOTEST
+#endif
+
+'' for other targets, see va_tmpstring-gcc.bas
+
+#ifdef DOTEST
 
 SUITE( fbc_tests.functions.va_tmpstring )
 
@@ -41,15 +47,5 @@ SUITE( fbc_tests.functions.va_tmpstring )
 	END_TEST
 
 END_SUITE
-
-#else
-
-#if ENABLE_CHECK_BUGS
-SUITE( fbc_tests.functions.va_tmpstring )
-	TEST( tempStringArg )
-		CU_FAIL()
-	END_TEST
-END_SUITE
-#endif
 
 #endif

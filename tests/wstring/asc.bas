@@ -19,4 +19,44 @@ SUITE( fbc_tests.wstring_.asc_ )
 		
 	END_TEST
 
+	TEST( ascii )
+		dim w as wstring * 256
+		for i as integer = 1 to 255
+			w[i-1] = i
+		next
+		
+		CU_ASSERT_EQUAL( 1, asc( w ) )
+
+		for i as integer = -2 to 257
+			select case i
+			case 1 to 255
+				CU_ASSERT_EQUAL( i, asc( w, i ) )
+			case else
+				CU_ASSERT_EQUAL( 0, asc( w, i ) )
+			end select
+		next
+	END_TEST
+
+'' only test where sizeof(wstring) >= 2, because
+'' it won't be on DOS where sizeof(wstring) = 1.
+#if sizeof(WSTRING) >= 2
+	TEST( ucs2 )
+		dim w as wstring * 256
+		for i as integer = 1 to 255
+			w[i-1] = i shl 8
+		next
+
+		CU_ASSERT_EQUAL( 256, asc( w ) )
+
+		for i as integer = -2 to 257
+			select case i
+			case 1 to 255
+				CU_ASSERT_EQUAL( w[i-1], asc( w, i ) )
+			case else
+				CU_ASSERT_EQUAL( 0, asc( w, i ) )
+			end select
+		next
+	END_TEST
+#endif
+
 END_SUITE

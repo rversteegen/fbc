@@ -4,7 +4,7 @@ Adds and assigns a value to a variable
 {{fbdoc item="syntax"}}##
 	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **+=** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] //T1//, [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] //T2// )
 	
-	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **+=** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] //T// [[KeyPgPointer|ptr]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgInteger|integer]] )
+	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **+=** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] //T// [[KeyPgPtr|ptr]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgInteger|integer]] )
 	
 	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **+=** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] [[KeyPgString|string]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgString|string]] )
 	[[KeyPgDeclare|declare]] [[KeyPgOperator|operator]] **+=** ( [[KeyPgByref|byref]] //lhs// [[KeyPgAs|as]] [[KeyPgWstring|wstring]], [[KeyPgByref|byref]] //rhs// [[KeyPgAs|as]] [[KeyPgWstring|wstring]] )
@@ -34,6 +34,8 @@ Adds and assigns a value to a variable
 	For string types, this operator is functionally equivalent to ##[[KeyPgOpCombineConcat|Operator &= (Concatenate and assign)]]##.
 	
 	This operator can be overloaded for user-defined types as a member ##[[KeyPgOperator|Operator]]## using the appropriate syntax.
+	
+	//Note: Similarly to the operator '=[>]' (assign), the alternative symbol '+=>' can be also used.//
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/operator/add-assign.bas"}}%%(freebasic)

@@ -70,6 +70,7 @@ enum AST_NODECLASS
 	AST_NODECLASS_TYPEINI_SCOPEEND
 
 	AST_NODECLASS_PROC
+	AST_NODECLASS_MACRO
 
 	AST_CLASSES
 end enum
@@ -535,6 +536,8 @@ enum AST_CONVOPT
 	AST_CONVOPT_DONTWARNFUNCPTR = &h20
 end enum
 
+declare function astTryOvlStringCONV( byref expr as ASTNODE ptr ) as integer
+
 declare function astNewCONV _
 	( _
 		byval to_dtype as integer, _
@@ -558,6 +561,7 @@ declare sub astUpdateCONVFD2FS _
 		byval is_expr as integer _
 	)
 
+declare function astSkipConstCASTs( byval n as ASTNODE ptr ) as ASTNODE ptr
 declare function astSkipNoConvCAST( byval n as ASTNODE ptr ) as ASTNODE ptr
 declare function astRemoveNoConvCAST( byval n as ASTNODE ptr ) as ASTNODE ptr
 declare function astSkipCASTs( byval n as ASTNODE ptr ) as ASTNODE ptr
@@ -805,6 +809,15 @@ declare function astNewMEM _
 		byval l as ASTNODE ptr, _
 		byval r as ASTNODE ptr, _
 		byval bytes as longint = 0 _
+	) as ASTNODE ptr
+
+declare function astNewMACRO _
+	( _
+		byval op as AST_OP, _
+		byval arg1 as ASTNODE ptr, _
+		byval arg2 as ASTNODE ptr, _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr _
 	) as ASTNODE ptr
 
 declare function astBuildNewOp _
@@ -1388,6 +1401,7 @@ declare function astLoadSCOPEBEGIN( byval n as ASTNODE ptr ) as IRVREG ptr
 declare function astLoadSCOPEEND( byval n as ASTNODE ptr ) as IRVREG ptr
 declare function astLoadDECL( byval n as ASTNODE ptr ) as IRVREG ptr
 declare function astLoadNIDXARRAY( byval n as ASTNODE ptr ) as IRVREG ptr
+declare function astLoadMACRO( byval n as ASTNODE ptr ) as IRVREG ptr
 
 ''
 '' macros

@@ -30,14 +30,19 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -54,7 +59,13 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 				charsleft = 8;
 				dst_size += charsleft;
 
-				buffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				if( newbuffer == NULL )
+				{
+					free( buffer );
+					return NULL;
+				}
+				buffer = newbuffer;
 				dst = buffer + dst_size - charsleft;
 			}
 
@@ -88,14 +99,19 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -146,14 +162,19 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -164,7 +185,13 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				charsleft = 8;
 				dst_size += charsleft;
-				buffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				if( newbuffer == NULL )
+				{
+					free( buffer );
+					return NULL;
+				}
+				buffer = newbuffer;
 				dst = buffer + dst_size - charsleft;
 			}
 			
@@ -190,14 +217,19 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 4:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 3:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 2:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 1:
 					c += *src++; c <<= 6;
+					/* fall through */
 				case 0:
 					c += *src++;
 			}
@@ -249,6 +281,8 @@ static FB_WCHAR *hUTF16ToUTF16( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 		while( src[len] )
 			len++;
 		dst = malloc( (len + 1) * sizeof( UTF_16 ) );
+		if( dst == NULL )
+			return NULL;
 		memcpy( dst, src, (len + 1) * sizeof( UTF_16 ) );
 	} else {
 		while( src[len] && len < *chars )
@@ -285,7 +319,12 @@ static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 			{
 				charsleft = 8;
 				dst_size += charsleft;
-				buffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				if( newbuffer == NULL ) {
+					free( buffer );
+					return NULL;
+				}
+				buffer = newbuffer;
 				dst = buffer + dst_size - charsleft;
 			}
 			
@@ -368,7 +407,12 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 				/* Make room for some chars */
 				charsleft = 8;
 				dst_size += charsleft;
-				buffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				if( newbuffer == NULL ) {
+					free( buffer );
+					return NULL;
+				}
+				buffer = newbuffer;
 				dst = buffer + dst_size - charsleft;
 			}
 			
@@ -430,6 +474,8 @@ static FB_WCHAR *hUTF32ToUTF32( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 		while( src[len] )
 			len++;
 		dst = malloc( (len + 1) * sizeof( UTF_32 ) );
+		if( dst == NULL )
+			return NULL;
 		memcpy( dst, src, (len + 1) * sizeof( UTF_32 ) );
 	} else {
 		while( src[len] && len < *chars )

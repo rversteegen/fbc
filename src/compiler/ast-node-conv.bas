@@ -285,7 +285,7 @@ end function
 		proc = symbFindCastOvlProc( to_dtype, to_subtype, node, @err_num )
 		if( proc <> NULL ) then
 			'' build a proc call
-			return astBuildCall( proc, l )
+			return astBuildCall( proc, node )
 		else
 			if( err_num <> FB_ERRMSG_OK ) then
 				return NULL
@@ -293,6 +293,43 @@ end function
 		end if
 	end scope
 #endmacro
+
+'':::::
+function astTryOvlStringCONV( byref expr as ASTNODE ptr ) as integer
+
+	dim as FBSYMBOL ptr proc = any, sym = any
+	dim as FB_ERRMSG err_num = any
+	dim as integer dtype = any
+
+	assert( expr )
+
+	if( astGetDataType( expr ) = FB_DATATYPE_STRUCT ) then
+		sym = astGetSubType( expr )
+
+		if( symbGetUdtIsZstring( sym ) ) then
+			dtype = FB_DATATYPE_CHAR
+		elseif( symbGetUdtIsWstring( sym ) ) then
+			dtype = FB_DATATYPE_WCHAR
+		else
+			dtype = FB_DATATYPE_VOID
+		end if
+
+		if( dtype <> FB_DATATYPE_VOID ) then
+			'' can cast to z|wstring?
+			proc = symbFindCastOvlProc( dtype, NULL, expr, @err_num )
+			if( proc ) then
+				'' same type?
+				if( symbGetType( proc ) = dtype ) then
+					expr = astBuildCall( proc, expr )
+					return TRUE
+				end if
+			end if
+		end if
+	end if
+
+	return FALSE
+
+end function
 
 '':::::
 function astNewCONV _
@@ -346,6 +383,44 @@ function astNewCONV _
 			end if
 
 			return n
+		end if
+	end if
+
+	'' UDT? check if it is z|wstring? 
+	'' !!! TODO !!! make this block in to a function
+	''              re-use in astNewOvlCONV()
+	''              rewrite hDoGlobOpOverload() as astTry* function
+	if( typeGet( ldtype ) = FB_DATATYPE_STRUCT ) then
+		dim as FBSYMBOL ptr subtype = astGetSubtype( l )
+
+		if( symbGetUdtIsZstring( subtype ) or symbGetUdtIsWstring( subtype ) ) then
+			dim as FBSYMBOL ptr proc = NULL
+			dim as FB_ERRMSG err_num = any
+
+			'' check exact casts
+			proc = symbFindCastOvlProc( to_dtype, to_subtype, l, @err_num, TRUE )
+			if( proc <> NULL ) then
+				'' build a proc call
+				return astBuildCall( proc, l )
+			end if
+
+			'' check exact string pointer casts
+			if( symbGetUdtIsZstring( subtype ) ) then
+				proc = symbFindCastOvlProc( typeAddrof( FB_DATATYPE_CHAR ), NULL, l, @err_num, TRUE )
+			elseif( symbGetUdtIsWstring( subtype ) ) then
+				proc = symbFindCastOvlProc( typeAddrof( FB_DATATYPE_WCHAR ), NULL, l, @err_num, TRUE )
+			end if
+			if( proc <> NULL ) then
+				'' build a proc call
+				return astBuildCall( proc, l )
+			end if
+
+			'' strings? convert.
+			if( options and AST_CONVOPT_CHECKSTR ) then
+				if( astTryOvlStringCONV( l ) ) then
+					ldtype = astGetFullType( l )
+				end if
+			end if
 		end if
 	end if
 
@@ -622,7 +697,7 @@ function astLoadCONV _
 	if( ast.doemit ) then
 		vs->vector = n->vector
 		if( n->cast.doconv ) then
-			vr = irAllocVreg( astGetDataType( n ), n->subtype )
+			vr = irAllocVreg( astGetFullType( n ), n->subtype )
 			vr->vector = n->vector
 			irEmitConvert( vr, vs )
 
@@ -639,7 +714,7 @@ function astLoadCONV _
 			end if
 		else
 			vr = vs
-			irSetVregDataType( vr, astGetDataType( n ), n->subtype )
+			irSetVregDataType( vr, astGetFullType( n ), n->subtype )
 		end if
 	end if
 
@@ -647,6 +722,15 @@ function astLoadCONV _
 
 	function = vr
 
+end function
+
+function astSkipConstCASTs( byval n as ASTNODE ptr ) as ASTNODE ptr
+	function = n
+	if( n->class = AST_NODECLASS_CONV ) then
+		if( n->cast.doconv = FALSE ) then
+			function = n->l
+		end if
+	end if
 end function
 
 function astSkipNoConvCAST( byval n as ASTNODE ptr ) as ASTNODE ptr

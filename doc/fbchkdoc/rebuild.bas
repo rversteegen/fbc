@@ -1,5 +1,5 @@
 ''  fbchkdoc - FreeBASIC Wiki Management Tools
-''	Copyright (C) 2008-2018 Jeffery R. Marshall (coder[at]execulink[dot]com)
+''	Copyright (C) 2008-2019 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -91,10 +91,11 @@ if( app_opt.help ) then
 end if
 
 cmd_opts_resolve()
-cmd_opts_check()
+cmd_opts_check_cache()
+cmd_opts_check_url()
 
 '' no pages? nothing to do...
-if( app_opt.webPageCount = 0 ) then
+if( app_opt.pageCount = 0 ) then
 	print "no pages specified."
 	end 1
 end if
@@ -106,11 +107,11 @@ dim as CWiki ptr wiki
 
 print "cache: "; app_opt.cache_dir
 
-for i = 1 to app_opt.webpagecount
+for i = 1 to app_opt.pageCount
 
 	wiki = new CWiki
 
-	sPage = app_opt.webpagelist(i)
+	sPage = app_opt.pageList(i)
 
 	f = app_opt.cache_dir + sPage + ".wakka"
 	sBody1 = ReadTextFile( f )

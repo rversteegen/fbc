@@ -854,8 +854,8 @@ add_proc:
 	'' last compound was an EXTERN?
 	if( fbGetCompStmtId( ) = FB_TK_EXTERN ) then
 		'' don't add parent when mangling, even if inside an UDT, unless
-		'' it's in "c++" mode
-		if( parser.mangling <> FB_MANGLING_CPP ) then
+		'' it's in "c++" mode or "rtlib" mode
+		if(( parser.mangling <> FB_MANGLING_CPP ) and ( parser.mangling <> FB_MANGLING_RTLIB )) then
 			stats or= FB_SYMBSTATS_EXCLPARENT
 		end if
 	end if
@@ -1296,7 +1296,7 @@ sub symbGetRealParamDtype overload _
 
 	assert( param->class = FB_SYMBCLASS_PARAM )
 
-	dtype = symbGetType( param )
+	dtype = symbGetFullType( param )
 	subtype = param->subtype
 
 	symbGetRealParamDtype( param->param.mode, param->param.bydescrealsubtype, dtype, subtype )
@@ -1883,18 +1883,17 @@ private function hCheckOvlParam _
 			return FB_OVLPROC_NO_MATCH
 		end if
 
-		'' not a full match?
-        if( param_dtype <> arg_dtype ) then
-        	return FB_OVLPROC_NO_MATCH
-        end if
+		var match = typeCalcMatch( param_dtype, param_subtype, symbGetParamMode( param ), arg_dtype, arg_subtype )
 
-        if( param_subtype <> arg_subtype ) then
-        	return FB_OVLPROC_NO_MATCH
-        end if
-
+		'' not same type?
+		if( match < FB_OVLPROC_TYPEMATCH ) then
+			return FB_OVLPROC_NO_MATCH
+		end if
+	
 		assert( astIsVAR( arg_expr ) or astIsFIELD( arg_expr ) )
 		array = arg_expr->sym
 		assert( symbIsArray( array ) )
+
 
 		'' If the BYDESC parameter has unknown dimensions, any array can be passed.
 		'' Otherwise, only arrays with unknown or matching dimensions can be passed.
@@ -1905,7 +1904,7 @@ private function hCheckOvlParam _
 			end if
 		end if
 
-		return FB_OVLPROC_FULLMATCH
+		return match
 
 	'' byref param?
 	case FB_PARAMMODE_BYREF
@@ -2367,7 +2366,8 @@ private function hCheckCastOvl _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval to_dtype as integer, _
-		byval to_subtype as FBSYMBOL ptr _
+		byval to_subtype as FBSYMBOL ptr, _
+		byval is_explicit as integer = FALSE _
 	) as FB_OVLPROC_MATCH_SCORE
 
 	dim as integer proc_dtype = any
@@ -2396,6 +2396,9 @@ private function hCheckCastOvl _
 	end if
 
 	'' different types..
+	if( is_explicit ) then
+		return FB_OVLPROC_NO_MATCH
+	end if
 
 	select case typeGet( proc_dtype )
 	'' UDT or enum? can't be different (this is the last resource,
@@ -2428,7 +2431,8 @@ function symbFindCastOvlProc _
 		byval to_dtype as integer, _
 		byval to_subtype as FBSYMBOL ptr, _
 		byval l as ASTNODE ptr, _
-		byval err_num as FB_ERRMSG ptr _
+		byval err_num as FB_ERRMSG ptr, _
+		byval is_explicit as integer = FALSE _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr proc_head = any
@@ -2471,7 +2475,7 @@ function symbFindCastOvlProc _
 		proc = proc_head
 		do while( proc <> NULL )
 
-			matchscore = hCheckCastOvl( proc, to_dtype, to_subtype )
+			matchscore = hCheckCastOvl( proc, to_dtype, to_subtype, is_explicit )
 			if( matchscore > max_matchscore ) then
 		   		closest_proc = proc
 		   		max_matchscore = matchscore

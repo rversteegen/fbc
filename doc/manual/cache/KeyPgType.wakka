@@ -9,11 +9,12 @@ Declares a user-defined type.
 		...
 	**End Type**
 	
-	**Type** //typename// [[[KeyPgExtends|Extends]] //base_typename//] [[[KeyPgField|Field]] = //alignment//]
+	**Type** //typename// [[[KeyPgAlias|Alias]] "alternatename"] [[[KeyPgExtends|Extends]] //base_typename//] [[[KeyPgField|Field]] = //alignment//]
 		[[[KeyPgVisPrivate|Private:]]|[[KeyPgVisPublic|Public:]]|[[KeyPgVisProtected|Protected:]]]
 		
 		[[KeyPgDeclare|Declare]] [[KeyPgMemberSub|Sub]]|[[KeyPgMemberFunction|Function]]|[[KeyPgConstructor|Constructor]]|[[KeyPgDestructor|Destructor]]|[[KeyPgProperty|Property]]|[[KeyPgOperator|Operator]] ...
 		[[KeyPgStatic|Static]] //variablename// [[KeyPgAs|As]] //[[DataType|DataType]]//
+		[[KeyPgRedim|Redim]] //arrayname(array dimensions)// [[KeyPgAs|As]] //[[DataType|DataType]]//
 		
 		//fieldname// [[KeyPgAs|As]] //[[DataType|DataType]]// [= //initializer//]
 		//fieldname//(//array dimensions//) [[KeyPgAs|As]] //[[DataType|DataType]]// [= //initializer//]
@@ -49,11 +50,14 @@ Declares a user-defined type.
 	
 	Types may also contain nested types or unions, allowing data members to be grouped as desired. Nested types/unions are not allowed to contain member procedures or static member variables (same restriction for local types/unions).
 	
+	##[[KeyPgAlias|Alias]] "alternatename"## specifies that if ##//typename//## must be encoded (mangled) in to a public symbol (as in an object module or library), then specifically use ##//alternate//## name instead of the usual encoding (mangling) of ##//typename//##.
+	
 	//Memory layout//
 	Types lay out their fields consecutively in memory, following the native alignment and padding rules (described on the ##[[KeyPgField|Field]]## page). Special care must be taken when using Types for file I/O or interacting with other programs or programming languages, in case the alignment and padding rules are different. The optional ##[[KeyPgField|Field]] = //number//## specifier can be used to change the behavior on the ""FreeBASIC"" side.
 	
 	//Variable-length data//
 	In ""FreeBASIC"", Type data structures must ultimately be fixed-size, such that the compiler knows how much memory to allocate for objects of that Type. Nevertheless, Types may contain variable-length (dynamic) string or array data members. However, the string's/array's data will not be embedded in the Type directly. Instead, the Type will only contain a ##[[KeyPgString|String]]##/array descriptor structure, which ""FreeBASIC"" uses behind the scenes to manage the variable-length string/array data. For sizing the structure of the array descriptor in the Type, a variable-length (dynamic) array data member must be always declared by using ##[[KeyPgAny|Any(s)]]## in place of the array bounds, in order to fix the amount of dimensions based on the number of Anys specified.
+	Variable-length array fields are considered as pseudo-objects when they are declared in a ##**Type**##, just like variable-length strings (the implicit copy constructor and the implicit let operator themselves support [re]sizing and copying such arrays, or their erasing).
 	
 	Because of that, saving such a Type into a file will write out the descriptor, not the actual string/array data. In order to embed strings/arrays into Types directly, fixed-length strings/arrays must be used.
 	
@@ -177,8 +181,11 @@ Sleep
 	- ##[[KeyPgEnum|Enum]]##
 	- ##[[KeyPgTypeof|Typeof]]##
 	- ##[[KeyPgOffsetof|OffsetOf]]##
+	- ##[[KeyPgAlias|Alias (Name)]]##
 	- ##[[KeyPgField|Field]]##
 	- ##[[KeyPgExtends|Extends]]##
+	- ##[[KeyPgExtendsZstring|Extends Zstring]]##
+	- ##[[KeyPgExtendsWstring|Extends Wstring]]##
 	- ##[[KeyPgWith|With]]##
 	- [[ProPgDataConversion|Coercion and Conversion]]
 

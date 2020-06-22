@@ -2,7 +2,7 @@
 #define __FBDOC_LOADER_WEB_BI__
 
 ''  fbdoc - FreeBASIC User's Manual Converter/Generator
-''	Copyright (C) 2006-2018 The FreeBASIC development team.
+''	Copyright (C) 2006-2019 The FreeBASIC development team.
 ''
 ''	This program is free software; you can redistribute it and/or modify
 ''	it under the terms of the GNU General Public License as published by
@@ -20,12 +20,12 @@
 
 
 #include once "fbdoc_defs.bi"
-#include once "CWikiCon.bi"
+#include once "CWikiConUrl.bi"
 
 namespace fb.fbdoc
 
 	declare sub Connection_SetUrl( byval url as zstring ptr, byval certificate as zstring ptr )
-	declare function Connection_Create( ) as CWikiCon ptr
+	declare function Connection_Create( ) as CWikiConUrl ptr
 	declare sub Connection_Destroy( )
 
 end namespace
