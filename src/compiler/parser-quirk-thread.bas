@@ -13,7 +13,7 @@
 '' ThreadCallFunc =   THREADCALL proc_call
 ''
 function cThreadCallFunc() as ASTNODE ptr
-    dim as FBSYMBOL ptr sym, result
+    dim as FBSYMBOL ptr sym
     dim as FBSYMCHAIN ptr chain_
     dim as integer check_paren
     dim as FB_CALL_ARG_LIST arg_list = ( 0, NULL, NULL )
@@ -22,7 +22,7 @@ function cThreadCallFunc() as ASTNODE ptr
     function = NULL
     
     '' THREADCALL
-    lexSkipToken( )
+	lexSkipToken( LEXCHECK_POST_SUFFIX )
     
     '' proc 
     chain_ = cIdentifier( NULL, FB_IDOPT_DEFAULT or FB_IDOPT_ALLOWSTRUCT )
@@ -38,15 +38,13 @@ function cThreadCallFunc() as ASTNODE ptr
     end if
     
     '' must be a sub
-    result = symbGetProcResult( sym )
-    if( result <> NULL ) then
-        if( symbGetType( result ) <> FB_DATATYPE_VOID ) then
-            errReport( FB_ERRMSG_EXPECTEDSUB )
-            exit function
-        end if
+    if( symbGetType( sym ) <> FB_DATATYPE_VOID ) then
+        errReport( FB_ERRMSG_EXPECTEDSUB )
+        exit function
     end if
 
-    lexSkipToken( )
+	'' ID
+    lexSkipToken( LEXCHECK_POST_SUFFIX )
     
     '' '('?
     if( hMatch( CHAR_LPRNT ) = FALSE ) then

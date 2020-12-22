@@ -123,12 +123,20 @@ enum
 	FBCTOOL_WINDRES
 	FBCTOOL_CXBE
 	FBCTOOL_DXEGEN
+	FBCTOOL_EMAS
+	FBCTOOL_EMAR
+	FBCTOOL_EMLD
+	FBCTOOL_EMCC
 	FBCTOOL__COUNT
 end enum
 
-static shared as zstring * 8 toolnames(0 to FBCTOOL__COUNT-1) = _
+static shared as zstring * 16 toolnames(0 to FBCTOOL__COUNT-1) = _
 { _
-	"as", "ar", "ld", "gcc", "llc", "dlltool", "GoRC", "windres", "cxbe", "dxe3gen" _
+	"as", "ar", "ld", "gcc", "llc", "dlltool", "GoRC", "windres", "cxbe", "dxe3gen", _
+	"emcc", _
+	"emar", _
+	"emcc", _
+	"emcc"  _
 }
 
 declare sub fbcFindBin _
@@ -198,6 +206,8 @@ private sub hSetOutName( )
 			'' Note: XBox target creates an .exe first,
 			'' then uses cxbe to turn it into an .xbe later
 			fbc.outname += ".exe"
+		case FB_COMPTARGET_JS
+			fbc.outname += ".html"
 		end select
 	case FB_OUTTYPE_DYNAMICLIB
 		select case( fbGetOption( FB_COMPOPT_TARGET ) )
@@ -377,7 +387,11 @@ private sub fbcFindBin _
 		#ifndef ENABLE_STANDALONE
 			if( hFileExists( path ) = FALSE ) then
 				'' c) Rely on PATH
-				path = fbc.targetprefix + toolnames(tool) + FB_HOST_EXEEXT
+				if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+					path = fbc.targetprefix + toolnames(tool) + FB_HOST_EXEEXT
+				else
+					path = toolnames(tool)
+				end if
 				relying_on_system = TRUE
 			end if
 		#endif
@@ -737,6 +751,29 @@ private function hLinkFiles( ) as integer
 	case FB_COMPTARGET_XBOX
 		ldcline += " -nostdlib --file-alignment 0x20 --section-alignment 0x20 -shared"
 
+	case FB_COMPTARGET_JS
+		ldcline += " -O" + str( fbGetOption( FB_COMPOPT_OPTIMIZELEVEL ) )
+		
+		static as zstring*32 emscripten_options(...) = _
+		{ _
+			"CASE_INSENSITIVE_FS=1", _
+			"TOTAL_MEMORY=67108864", _
+			"ALLOW_MEMORY_GROWTH=1", _
+			"RETAIN_COMPILER_SETTINGS=1" _
+		}
+			'"WARN_UNALIGNED=1", _
+		
+		ldcline += " -Wno-warn-absolute-paths"
+		for i as integer = 0 to ubound(emscripten_options)
+			ldcline += " -s " + emscripten_options(i)
+		next
+		
+		ldcline += " --shell-file" + hFindLib("fb_shell.html")
+		ldcline += " --post-js" + hFindLib("fb_rtlib.js")
+		if( len(fbc.subsystem) = 0 ) then
+			ldcline += " --post-js" + hFindLib("termlib_min.js")
+		end if
+
 	end select
 
 	if (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) then
@@ -752,6 +789,7 @@ private function hLinkFiles( ) as integer
 		''    of linker script (results in broken binaries).
 		if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) and _
+			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) and _
 		    (not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
 		end if
@@ -796,7 +834,8 @@ private function hLinkFiles( ) as integer
 
 	if( fbGetOption( FB_COMPOPT_DEBUGINFO ) = FALSE ) then
 		if( fbGetOption( FB_COMPOPT_PROFILE ) = FALSE ) then
-			if( fbc.stripsymbols ) then
+			if(( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) and _
+			  ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS )) then
 				ldcline += " -s"
 			end if
 		end if
@@ -805,8 +844,16 @@ private function hLinkFiles( ) as integer
 	'' Add the library search paths
 	scope
 		dim as TSTRSETITEM ptr i = listGetHead(@fbc.finallibpaths.list)
+		
+		dim as string L 
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			L = " -L """
+		else
+			L = " -L"""
+		end if
+		
 		while (i)
-			ldcline += " -L """ + i->s + """"
+			ldcline += L + i->s + """"
 			i = listGetNext(i)
 		wend
 	end scope
@@ -899,13 +946,16 @@ private function hLinkFiles( ) as integer
 	end select
 
 	if( fbc.nodeflibs = FALSE ) then
-		ldcline += " """ + fbc.libpath + FB_HOST_PATHDIV
-		if( fbGetOption( FB_COMPOPT_PIC ) ) then
-			ldcline += "fbrt0pic.o"
-		else
-			ldcline += "fbrt0.o"
+		'' don't add the fbrt0 if compiling for javascript, because global constructors and destructors are not supported by emscripten
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			ldcline += " """ + fbc.libpath + FB_HOST_PATHDIV
+			if( fbGetOption( FB_COMPOPT_PIC ) ) then
+				ldcline += "fbrt0pic.o"
+			else
+				ldcline += "fbrt0.o"
+			end if
+			ldcline += """"
 		end if
-		ldcline += """"
 	end if
 
 	scope
@@ -920,7 +970,9 @@ private function hLinkFiles( ) as integer
 	'' All libraries are passed inside -( -) so we don't need to worry as
 	'' much about their order and/or listing them repeatedly. (Not supported by Darwin ld)
 	if ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
-		ldcline += " ""-("""
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			ldcline += " ""-("""
+		end if
 	end if
 
 	'' Add libraries passed by file name
@@ -949,8 +1001,12 @@ private function hLinkFiles( ) as integer
 	end scope
 
 	if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
-		'' End of lib group
-		ldcline += " ""-)"""
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			'' End of lib group
+			ldcline += " ""-)"""
+		else
+			ldcline += " -lfb"
+		end if
 	end if
 
 	'' crt end
@@ -1037,7 +1093,12 @@ private function hLinkFiles( ) as integer
 	#endif
 
 	'' invoke ld
-	if( fbcRunBin( "linking", FBCTOOL_LD, ldcline ) = FALSE ) then
+	var ld = FBCTOOL_LD
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+		ld = FBCTOOL_EMLD
+	end if
+	
+	if( fbcRunBin( "linking", ld, ldcline ) = FALSE ) then
 		exit function
 	end if
 
@@ -1722,6 +1783,8 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 			fbc.backend = FB_BACKEND_GCC
 		case "llvm"
 			fbc.backend = FB_BACKEND_LLVM
+		Case "gas64"
+			fbc.backend = FB_BACKEND_GAS64
 		case else
 			hFatalInvalidOption( arg )
 		end select
@@ -1968,6 +2031,10 @@ private sub handleOpt(byval optid as integer, byref arg as string)
 			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
 						 fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CASTFUNCPTR )
 			value = FB_WARNINGMSGS_LOWEST_LEVEL
+
+		case "suffix"
+			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+						 fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_SUFFIX )
 
 		case "pedantic"
 			fbSetOption( FB_COMPOPT_PEDANTICCHK, FB_PDCHECK_DEFAULT )
@@ -2457,15 +2524,19 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 	end if
 
 	'' 7. Check whether backend supports the target/arch.
-	'' -gen gas with non-x86 arch isn't possible.
-	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS ) then
-		if( fbGetCpuFamily( ) <> FB_CPUFAMILY_X86 ) then
-			errReportEx( FB_ERRMSG_GENGASWITHNONX86, fbGetFbcArch( ), -1 )
-			fbcEnd( 1 )
-		elseif( fbGetOption( FB_COMPOPT_PIC ) ) then
-			errReportEx( FB_ERRMSG_GENGASWITHPIC, "", -1 )
-			fbcEnd( 1 )
-		end if
+	'' -gen gas with non-x86 arch or with PIC isn't possible.
+	if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) and _
+	    (fbGetCpuFamily( ) <> FB_CPUFAMILY_X86)) _
+	    or ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS64) and _
+	    (fbGetCpuFamily( ) <> FB_CPUFAMILY_X86_64)) ) then
+		errReportEx( FB_ERRMSG_GENGASWITHNONX86, fbGetFbcArch( ), -1 )
+		fbcEnd( 1 )
+	end if
+	if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) or _
+	     (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS64)) and _
+	    fbGetOption( FB_COMPOPT_PIC ) ) then
+		errReportEx( FB_ERRMSG_GENGASWITHPIC, "", -1 )
+		fbcEnd( 1 )
 	end if
 
 	'' Resource scripts are only allowed for win32 & co,
@@ -2502,7 +2573,7 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 		end select
 
 		'' -gen gas only supports -asm intel
-		if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) and _
+		if( ( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) or (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS64) ) and _
 		    (fbc.asmsyntax <> FB_ASMSYNTAX_INTEL) ) then
 			errReportEx( FB_ERRMSG_GENGASWITHOUTINTEL, "", -1 )
 		end if
@@ -2674,8 +2745,14 @@ private function hGetAsmName _
 	'' Based on the objfile name so it's also affected by -o
 	asmfile = hStripExt( *module->objfile )
 
-	ext = @".asm"
-
+	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+		ext = @".asm"
+	else
+		ext = @".o"
+	end if
+	if( fbGetOption( FB_COMPOPT_BACKEND )= FB_BACKEND_GAS64 ) then
+		ext = @".a64"
+	end if
 	if( stage = 1 ) then
 		select case( fbGetOption( FB_COMPOPT_BACKEND ) )
 		case FB_BACKEND_GCC
@@ -2989,7 +3066,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 	asmfile = hGetAsmName( module, 2 )
 	'' Clean up stage 2 output (the final .asm for -gen gcc/llvm) unless
 	'' -RR was given.
-	if( fbc.keepfinalasm = FALSE ) then
+	if( (not fbc.keepfinalasm) and _
+	    ((fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) or _
+	     (not fbc.keepobj)) ) then
 		fbcAddTemp( asmfile )
 	end if
 
@@ -3002,10 +3081,12 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-m64 "
 		end select
 
-		if( fbc.cputype_is_native ) then
-			ln += "-march=native "
-		else
-			ln += "-march=" + *fbGetGccArch( ) + " "
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			if( fbc.cputype_is_native ) then
+				ln += "-march=native "
+			else
+				ln += "-march=" + *fbGetGccArch( ) + " "
+			end if
 		end if
 
 		if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID) and _
@@ -3019,9 +3100,16 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-fPIC "
 		end if
 
-		ln += "-S -nostdlib -nostdinc -Wall -Wno-unused-label " + _
-		      "-Wno-unused-function -Wno-unused-variable " + _
-		      "-Wno-unused-but-set-variable "
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			ln += "-S -nostdlib -nostdinc -Wall -Wno-unused-label " + _
+			      "-Wno-unused-function -Wno-unused-variable " 
+			ln += "-Wno-unused-but-set-variable "
+		else
+			'if Emscripten is used, we will skip the assembly generation and compile directly to object code
+			ln += "-c -nostdlib -nostdinc -Wall -Wno-unused-label " + _
+			      "-Wno-unused-function -Wno-unused-variable " 
+			ln += "-Wno-warn-absolute-paths -s ASYNCIFY=1 -s RETAIN_COMPILER_SETTINGS=1 "
+		end if
 
 		'' Don't warn about non-standard main() signature
 		'' (we emit "ubyte **argv" instead of "char **argv")
@@ -3030,13 +3118,17 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		'' helps finding ir-hlc bugs
 		ln += "-Werror-implicit-function-declaration "
 
-		ln += "-O" + str( fbGetOption( FB_COMPOPT_OPTIMIZELEVEL ) ) + " "
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			ln += "-O" + str( fbGetOption( FB_COMPOPT_OPTIMIZELEVEL ) ) + " "
+		end if
 
 		'' Do not let gcc make assumptions about pointers; FB isn't strict about it.
 		ln += "-fno-strict-aliasing "
 
 		'' The rtlib sets its own rounding mode, don't let gcc make assumptions.
-		ln += "-frounding-math "
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+			ln += "-frounding-math "
+		end if
 
 		'' ?
 		ln += "-fno-math-errno "
@@ -3155,7 +3247,11 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 
 	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
 	case FB_BACKEND_GCC
-		function = fbcRunBin( "compiling C", FBCTOOL_GCC, ln )
+		var gcc = FBCTOOL_GCC
+		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+			gcc = FBCTOOL_EMCC
+		end if
+		function = fbcRunBin( "compiling C", gcc, ln )
 	case FB_BACKEND_LLVM
 		function = fbcRunBin( "compiling LLVM IR", FBCTOOL_LLC, ln )
 	end select
@@ -3191,14 +3287,28 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 
 	if( fbGetOption( FB_COMPOPT_DEBUGINFO ) = FALSE ) then
 		if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
-			ln += "--strip-local-absolute "
+			if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+				ln += "--strip-local-absolute "
+			end if
 		endif
 	end if
+
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+		'' We will skip assemble stage, since it is already performed by Emscripten
+		function = TRUE
+		exit function
+	end if
+
 	ln += """" + hGetAsmName( module, 2 ) + """ "
 	ln += "-o """ + *module->objfile + """"
 	ln += fbc.extopt.gas
-
-	if( fbcRunBin( "assembling", FBCTOOL_AS, ln ) = FALSE ) then
+	
+	var gas = FBCTOOL_AS
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+		gas = FBCTOOL_EMAS
+	end if
+	
+	if( fbcRunBin( "assembling", gas, ln ) = FALSE ) then
 		exit function
 	end if
 
@@ -3380,7 +3490,9 @@ private sub hSetDefaultLibPaths( )
 	'' Add gcc's private lib directory, to find libgcc
 	'' This is for installing into Unix-like systems, and not for
 	'' standalone, which has libgcc in the main lib/.
-	fbcAddLibPathFor( "libgcc.a" )
+	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+		fbcAddLibPathFor( "libgcc.a" )
+	end if
 
 	select case( fbGetOption( FB_COMPOPT_TARGET ) )
 	case FB_COMPTARGET_DOS
@@ -3672,6 +3784,16 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -vec <n>         Automatic vectorization level (default: 0)"
 	print "  [-]-version      Show compiler version"
 	print "  -w all|pedantic|<n>  Set min warning level: all, pedantic or a value"
+	if( verbose ) then
+	print "  -w all           Enable all warnings"
+	print "  -w none          Disable all warnings"
+	print "  -w param         Enable parameter warnings"
+	print "  -w escape        Enable string escape sequence warnings"
+	print "  -w next          Enable next statement warnings"
+	print "  -w signedness    Enable type signedness warnings"
+	print "  -w constness     Enable const type warnings"
+	print "  -w suffix        Enable invalid suffix warnings"
+	end if
 	print "  -Wa <a,b,c>      Pass options to 'as'"
 	print "  -Wc <a,b,c>      Pass options to 'gcc' (-gen gcc) or 'llc' (-gen llvm)"
 	print "  -Wl <a,b,c>      Pass options to 'ld'"
@@ -3804,7 +3926,8 @@ end sub
 		fbcEnd( 0 )
 	end if
 
-	if( fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS ) then
+	if( (fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS)  and _
+		fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS64 ) then
 		''
 		'' Compile intermediate .c modules produced by -gen gcc
 		''

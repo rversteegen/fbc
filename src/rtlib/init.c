@@ -2,6 +2,7 @@
 
 #include "fb.h"
 #include <locale.h>
+#include "fb_private_thread.h"
 
 FB_RTLIB_CTX __fb_ctx /* not initialized */;
 static int __fb_is_inicnt = 0;
@@ -23,6 +24,7 @@ void fb_hRtInit( void )
 #ifdef ENABLE_MT
 	fb_TlsInit( );
 #endif
+	fb_AllocateMainFBThread();
 
 	/**
 	 * With the default "C" locale (which is just plain 7-bit ASCII),
@@ -107,6 +109,11 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 	__fb_ctx.argc = argc;
 	__fb_ctx.argv = argv;
 	__fb_ctx.lang = lang;
+
+#ifdef HOST_JS
+    // global constructors and destructors are not supported by emscripten
+    fb_hRtInit();
+#endif // HOST_JS
 }
 
 /* called by FB program,
@@ -115,5 +122,11 @@ FBCALL void fb_End( int errlevel )
 {
 	if( __fb_ctx.exit_gfxlib2 )
 		__fb_ctx.exit_gfxlib2( );
+
+#ifdef HOST_JS
+    // global constructors and destructors are not supported by emscripten
+    fb_hRtExit();
+#endif // HOST_JS
+
 	exit( errlevel );
 }

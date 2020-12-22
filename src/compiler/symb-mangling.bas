@@ -62,8 +62,8 @@ sub symbMangleEnd( )
 	flistEnd( @ctx.flist  )
 end sub
 
-function symbUniqueId( ) as zstring ptr
-	if( env.clopt.backend = FB_BACKEND_GCC ) then
+function symbUniqueId( byval validfbname as boolean ) as zstring ptr
+	if( (env.clopt.backend = FB_BACKEND_GCC) and (validfbname = false) ) then
 		ctx.tempstr = "tmp$"
 		ctx.tempstr += str( ctx.uniqueidcount )
 	else
@@ -509,20 +509,29 @@ sub symbMangleType _
 		if( typeGetDtOnly( dtype ) = FB_DATATYPE_STRUCT ) then
 			if( typeGetMangleDt( dtype ) = FB_DATATYPE_VA_LIST ) then
 
-				'' if the type was passed as byval ptr or byref
-				'' need to mangle in "A1_" to indicate the array type, but
-				'' not on aarch64, __va_list is a plain struct, it doesn't
-				'' need the array type specifier.
+				select case symbGetValistType( dtype, subtype )
+				case FB_CVA_LIST_BUILTIN_C_STD
+					'' if the type was passed as byval ptr or byref
+					'' need to mangle in "A1_" to indicate the array type, but
+					'' not on aarch64, __va_list is a plain struct, it doesn't
+					'' need the array type specifier.
 
-				if( symbIsValistStructArray( dtype, subtype ) ) then
 					if( (options and (FB_MANGLEOPT_HASREF or FB_MANGLEOPT_HASPTR)) <> 0 ) then
 						mangled += "A1_"
 					else
 						mangled += "P"
 					end if
-				end if
+					dtype = typeSetMangleDt( dtype, 0 )
 
-				dtype = typeSetMangleDt( dtype, 0 )
+				case FB_CVA_LIST_BUILTIN_AARCH64, FB_CVA_LIST_BUILTIN_ARM
+					'' on arm and aarch targets, __builtin_va_list actually
+					'' maps to "std::__va_list" where "std::" has the mangling
+					'' identifier of "St"
+
+					mangled += "St"
+					dtype = typeSetMangleDt( dtype, 0 )
+
+				end select
 			end if
 		end if
 	end if
@@ -532,7 +541,7 @@ sub symbMangleType _
 	''
 	assert( dtype = (typeGetDtOnly( dtype ) or (dtype and FB_DT_MANGLEMASK)) )
 
-	select case( dtype )
+	select case( typeGetDtOnly( dtype ) )
 	case FB_DATATYPE_STRUCT, FB_DATATYPE_ENUM
 		ns = symbGetNamespace( subtype )
 		if( ns = @symbGetGlobalNamespc( ) ) then
@@ -564,7 +573,7 @@ sub symbMangleType _
 		mangled += "F"
 
 		'' return BYREF?
-		if( symbIsRef( subtype ) ) then
+		if( symbIsReturnByRef( subtype ) ) then
 			mangled += "R"
 		end if
 
@@ -775,7 +784,7 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 			'' BASIC? use the upper-cased name
 			if( symbGetMangling( sym ) = FB_MANGLING_BASIC ) then
 				id = *sym->id.name
-				if( env.clopt.backend = FB_BACKEND_GCC ) then
+				if( ( env.clopt.backend = FB_BACKEND_GCC ) or (env.clopt.backend = FB_BACKEND_GAS64) ) then
 					id += "$"
 				end if
 			'' else, the case-sensitive name saved in the alias..
@@ -843,6 +852,27 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 					'' conflicts between sibling scopes)
 					id += "." + str( varcounter )
 					varcounter += 1
+				else
+					'' Use the case-sensitive name saved in the alias
+					id = *sym->id.alias
+				end if
+			case FB_BACKEND_GAS64
+				if( symbGetMangling( sym ) = FB_MANGLING_BASIC ) then
+					'' BASIC mangling, use the upper-cased name
+					id = *sym->id.name
+
+					'' Type suffix?
+					if( symbIsSuffixed( sym ) ) then
+						id += *hMangleBuiltInType( symbGetType( sym ) )
+					end if
+
+					'' Make the symbol unique - gas doesn't have scopes.
+					'' (appending the scope level wouldn't be enough due to
+					'' conflicts between sibling scopes)
+					id += "." + str( varcounter )
+					varcounter += 1
+				elseif( symbIsStatic( sym ) ) then
+					id = *symbUniqueId( )
 				else
 					'' Use the case-sensitive name saved in the alias
 					id = *sym->id.alias

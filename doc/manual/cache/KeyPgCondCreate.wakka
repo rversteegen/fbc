@@ -11,7 +11,7 @@ Creates a conditional variable to be used in synchronizing threads
 	A handle to a newly created conditional variable, or the null pointer (0) on failure.
 
 {{fbdoc item="desc"}}
-	Once the conditional is **Condcreate**d and the threads are started, one or more of them (including the main thread executing main program) can be set to ##[[KeyPgCondWait|Condwait]]## for the conditional, they will be stopped until some other thread ##[[KeyPgCondSignal|Condsignal]]##s that the waiting thread can restart. ##[[KeyPgCondBroadcast|Condbroadcast]]## can be used to restart all threads waiting for the conditional. At the end of the program ##[[KeyPgCondDestroy|Conddestroy]]## must be used to avoid leaking resources in the OS.
+	Once the conditional is **Condcreate**d and the threads are started, one or more of them (including the implicit main thread executing main program) can be set to ##[[KeyPgCondWait|Condwait]]## for the conditional, they will be stopped until some other thread ##[[KeyPgCondSignal|Condsignal]]##s that the waiting thread can restart. ##[[KeyPgCondBroadcast|Condbroadcast]]## can be used to restart all threads waiting for the conditional. At the end of the program ##[[KeyPgCondDestroy|Conddestroy]]## must be used to avoid leaking resources in the OS.
 
 {{fbdoc item="ex"}}
 	See also ##[[KeyPgCondWait|Condwait]]## and ##[[KeyPgCondSignal|Condsignal]]##
@@ -172,7 +172,7 @@ Static Sub ThreadUDT.Thread (ByVal param As Any Ptr) 'Generic user thread proced
 			Exit Do
 		End If
 		MutexUnlock(tp->sync)                        'Mutex (Unlock) for user thread
-		Sleep 5
+		Sleep 5, 1
 	Loop
 End Sub
 
@@ -193,7 +193,7 @@ Sub PointOnCircle (ByVal p As Any Ptr)
 	Dim pp As Point2D Ptr = p
 	Dim teta As Single = 2 * pi * Rnd
 	pp->x = x0 + r0 * Cos(teta)
-	Sleep 5                            'To increase possibility of uncorrelated data occurrence
+	Sleep 5, 1                         'To increase possibility of uncorrelated data occurrence
 	pp->y = y0 + r0 * Sin(teta)
 End Sub
 
@@ -235,7 +235,7 @@ Do
 		Exit Do
 	End If
 	MutexUnlock(Tptr->sync)               'Mutex (Unlock) for main thread
-	Sleep 5
+	Sleep 5, 1
 Loop
  
 

@@ -201,6 +201,15 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 			or FB_TARGETOPT_RETURNINREGS _
 			or FB_TARGETOPT_ELF _
+	), _
+	( _
+		@"js", _
+		FB_DATATYPE_USHORT, _   '' wchar
+		FB_FUNCMODE_CDECL, _
+		FB_FUNCMODE_STDCALL_MS, _
+		0	or FB_TARGETOPT_UNIX _
+			or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
+			or FB_TARGETOPT_RETURNINREGS _
 	) _
 }
 
@@ -214,7 +223,8 @@ dim shared as FBCPUFAMILYINFO cpufamilyinfo(0 to FB_CPUFAMILY__COUNT-1) = _
 	(@"x86"    , FB_DEFAULT_CPUTYPE_X86    ), _
 	(@"x86_64" , FB_DEFAULT_CPUTYPE_X86_64 ), _
 	(@"arm"    , FB_DEFAULT_CPUTYPE_ARM    ), _
-	(@"aarch64", FB_DEFAULT_CPUTYPE_AARCH64)  _
+	(@"aarch64", FB_DEFAULT_CPUTYPE_AARCH64), _
+	(@"asmjs"  , FB_DEFAULT_CPUTYPE_ASMJS  )  _
 }
 
 type FBCPUTYPEINFO
@@ -243,7 +253,8 @@ dim shared as FBCPUTYPEINFO cputypeinfo(0 to FB_CPUTYPE__COUNT-1) = _
 	( NULL       , @"armv5te"      , FB_CPUFAMILY_ARM    , 32 ), _ '' FB_CPUTYPE_ARMV5TE
 	( NULL       , @"armv6"        , FB_CPUFAMILY_ARM    , 32 ), _ '' FB_CPUTYPE_ARMV6
 	( NULL       , @"armv7-a"      , FB_CPUFAMILY_ARM    , 32 ), _ '' FB_CPUTYPE_ARMV7A
-	( @"armv8-a" , @"aarch64"      , FB_CPUFAMILY_AARCH64, 64 )  _ '' FB_CPUTYPE_AARCH64
+	( NULL       , @"aarch64"      , FB_CPUFAMILY_AARCH64, 64 ), _ '' FB_CPUTYPE_AARCH64
+	( NULL       , @"asmjs"        , FB_CPUFAMILY_ASMJS	 , 32 )  _ '' FB_CPUTYPE_ASMJS
 }
 
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -342,6 +353,8 @@ function fbGetBackendName _
 		function = "gcc"
 	case FB_BACKEND_LLVM
 		function = "llvm"
+	case FB_BACKEND_GAS64
+		function = "gas64"
 	end select
 
 end function
@@ -433,12 +446,18 @@ sub fbInit( byval ismain as integer, byval restarts as integer )
 	hashInit( @env.inconcehash, FB_INITINCFILES, FALSE )
 
 	stackNew( @parser.stmt.stk, FB_INITSTMTSTACKNODES, len( FB_CMPSTMTSTK ), FALSE )
-	lexInit( FALSE )
+	lexInit( FALSE, FALSE )
 	parserInit( )
 	rtlInit( )
+
+	'' env.inited indicates that lexer/parser/compiler/rtl is initialized
+	'' intent is to help debug internal functions where we general want to
+	'' ignore function calls (breakpoints) while fbc itself is starting up
+	env.inited = TRUE
 end sub
 
 sub fbEnd()
+	env.inited = FALSE
 	rtlEnd( )
 	parserEnd( )
 	lexEnd( )
@@ -1469,7 +1488,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	'' parse
 	lexPushCtx( )
 
-	lexInit( TRUE )
+	lexInit( TRUE, FALSE )
 
 	cProgram()
 
@@ -1534,7 +1553,7 @@ function fbGetBackendValistType _
 			end select
 
 		case FB_CPUFAMILY_ARM
-			typedef = FB_CVA_LIST_BUILTIN_POINTER
+			typedef = FB_CVA_LIST_BUILTIN_ARM
 
 		case FB_CPUFAMILY_AARCH64
 			typedef = FB_CVA_LIST_BUILTIN_AARCH64
@@ -1550,6 +1569,15 @@ function fbGetBackendValistType _
 	case FB_BACKEND_LLVM
 		'' ???
 		typedef = FB_CVA_LIST_POINTER
+
+	case FB_BACKEND_GAS64
+		'typedef = FB_CVA_LIST_BUILTIN_POINTER
+		select case env.clopt.target
+		case FB_COMPTARGET_WIN32
+			typedef = FB_CVA_LIST_BUILTIN_POINTER
+		case else
+			typedef = FB_CVA_LIST_BUILTIN_C_STD
+		end select
 
 	case else
 		typedef = FB_CVA_LIST_POINTER

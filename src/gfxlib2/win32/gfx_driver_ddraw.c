@@ -67,7 +67,13 @@ typedef HRESULT (WINAPI *DIRECTDRAWENUMERATEEX)(LPDDENUMCALLBACKEX lpCallback,LP
 /* Unfortunately c_dfDIKeyboard is a required global variable
  * defined in import library LIBDINPUT.A, and as we're not
  * linking with it, we need to define it here...
+ * 
+ * ARRAYSIZE won't be defined for really old gcc  
  */
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(__a) (sizeof(__a)/sizeof(__a[0]))
+#endif
+ 
 static DIOBJECTDATAFORMAT __c_rgodfDIKeyboard[256];
 static const DIDATAFORMAT __c_dfDIKeyboard = { sizeof(__c_dfDIKeyboard), sizeof(*__c_rgodfDIKeyboard),
                                                DIDF_RELAXIS, 256,
@@ -223,7 +229,7 @@ static int directx_init(void)
 	rect.bottom = fb_win32.h;
 
 	if (fb_win32.flags & DRIVER_FULLSCREEN) {
-		if (fb_hInitWindow(WS_POPUP | WS_VISIBLE, 0, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)))
+		if (fb_hInitWindow(WS_POPUP, 0, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)))
 			return -1;
 		if (IDirectDraw2_SetCooperativeLevel(lpDD, fb_win32.wnd, DDSCL_ALLOWREBOOT | DDSCL_FULLSCREEN | DDSCL_EXCLUSIVE) != DD_OK)
 			return -1;
@@ -257,9 +263,9 @@ static int directx_init(void)
 		display_offset = ((height - fb_win32.h) >> 1);
 	} else {
 		if (fb_win32.flags & DRIVER_NO_FRAME) {
-			style = WS_POPUP | WS_VISIBLE;
+			style = WS_POPUP;
 		} else {
-			style = (WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME) | WS_VISIBLE;
+			style = (WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME);
 			if (fb_win32.flags & DRIVER_NO_SWITCH)
 				style &= ~WS_MAXIMIZEBOX;
 		}
@@ -340,6 +346,8 @@ static int directx_init(void)
 		return -1;
 	if (IDirectInputDevice_Acquire(lpDID) != DI_OK)
 		return -1;
+
+	ShowWindow(fb_win32.wnd, SW_SHOWNORMAL);
 
 	return 0;
 }
@@ -556,4 +564,4 @@ static int *driver_fetch_modes(int depth, int *size)
 	return modes.data;
 }
 
-#endif
+#endif /* HOST_CYGWIN */

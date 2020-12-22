@@ -68,7 +68,6 @@
 #define DRIVER_OGL_2D_MANUAL_SYNC   1
 #define DRIVER_OGL_2D_AUTO_SYNC     2
 
-
 #define LINE_TYPE_LINE		0
 #define LINE_TYPE_B		1
 #define LINE_TYPE_BF		2
@@ -92,29 +91,6 @@
 #define PUT_HEADER_NEW		0x7
 
 #define WINDOW_TITLE_SIZE	128
-
-#define EVENT_KEY_PRESS				1
-#define EVENT_KEY_RELEASE			2
-#define EVENT_KEY_REPEAT			3
-#define EVENT_MOUSE_MOVE			4
-#define EVENT_MOUSE_BUTTON_PRESS	5
-#define EVENT_MOUSE_BUTTON_RELEASE	6
-#define EVENT_MOUSE_DOUBLE_CLICK	7
-#define EVENT_MOUSE_WHEEL			8
-#define EVENT_MOUSE_ENTER			9
-#define EVENT_MOUSE_EXIT			10
-#define EVENT_WINDOW_GOT_FOCUS		11
-#define EVENT_WINDOW_LOST_FOCUS		12
-#define EVENT_WINDOW_CLOSE			13
-#define EVENT_MOUSE_HWHEEL			14
-
-#define MAX_EVENTS					128
-
-#define BUTTON_LEFT					0x1
-#define BUTTON_RIGHT					0x2
-#define BUTTON_MIDDLE				0x4
-#define BUTTON_X1						0x8
-#define BUTTON_X2						0x10
 
 #define GET_WINDOW_POS				0
 #define GET_WINDOW_TITLE			1
@@ -164,25 +140,6 @@ typedef struct _GFX_CHAR_CELL {
     FB_WCHAR ch;
     unsigned fg, bg;
 } GFX_CHAR_CELL;
-
-struct _EVENT {
-	int type;
-	union {
-		struct {			/* keyboard events */
-			int scancode;
-			int ascii;
-		};
-		struct {			/* mouse events */
-			int x, y;
-			int dx, dy;
-		};
-		int button;
-		int z;
-		int w;
-	};
-} FBPACKED;
-
-typedef struct _EVENT EVENT;
 
 typedef struct FBGFX
 {
@@ -490,7 +447,7 @@ extern FBCALL void fb_GfxPaletteGet64(int index, long long *r, long long *g, lon
 extern FBCALL void fb_GfxPaletteGetUsing(int *data);
 extern FBCALL void fb_GfxPaletteGetUsing64(long long *data);
 extern FBCALL void fb_GfxPset(void *target, float x, float y, unsigned int color, int coord_type, int ispreset);
-extern FBCALL ssize_t fb_GfxPoint(void *target, float x, float y);
+extern FBCALL unsigned int fb_GfxPoint(void *target, float x, float y);
 extern FBCALL float fb_GfxPMap(float coord, int func);
 extern FBCALL float fb_GfxCursor(int func);
 extern FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, unsigned int border_color, int screen);

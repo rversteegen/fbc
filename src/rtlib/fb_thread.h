@@ -10,6 +10,7 @@ struct _FBCOND;
 typedef struct _FBCOND FBCOND;
 
 FBCALL FBTHREAD         *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack_size );
+FBCALL FBTHREAD		*fb_ThreadSelf  ( void );
 FBCALL void              fb_ThreadWait  ( FBTHREAD *thread );
 FBCALL void              fb_ThreadDetach( FBTHREAD *thread );
 
@@ -36,15 +37,24 @@ enum {
 	FB_TLSKEY_INPUT,
 	FB_TLSKEY_PRINTUSG,
 	FB_TLSKEY_GFX,
+	FB_TLSKEY_FBTHREAD,
 	FB_TLSKEYS
 };
 
-FBCALL void             *fb_TlsGetCtx   ( int index, size_t len );
-FBCALL void              fb_TlsDelCtx   ( int index );
-FBCALL void              fb_TlsFreeCtxTb( void );
+typedef void ( *FB_TLS_DESTRUCTOR )( void* tlsData );
+
+typedef struct _FB_TLS_CTX_HEADER {
+
+    FB_TLS_DESTRUCTOR destructor;
+
+} FB_TLS_CTX_HEADER;
+
+FBCALL void             *fb_TlsGetCtx        ( int index, size_t len, FB_TLS_DESTRUCTOR destructor );
+FBCALL void              fb_TlsDelCtx        ( int index );
+FBCALL void              fb_TlsFreeCtxTb     ( void );
 #ifdef ENABLE_MT
-       void              fb_TlsInit     ( void );
-       void              fb_TlsExit     ( void );
+       void              fb_TlsInit          ( void );
+       void              fb_TlsExit          ( void );
 #endif
 
-#define FB_TLSGETCTX(id) ((FB_##id##CTX *)fb_TlsGetCtx( FB_TLSKEY_##id, sizeof( FB_##id##CTX ) ))
+#define FB_TLSGETCTX(id) ((FB_##id##CTX *)fb_TlsGetCtx( FB_TLSKEY_##id, sizeof( FB_##id##CTX ), fb_##id##CTX_Destructor ))

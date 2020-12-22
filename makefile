@@ -105,6 +105,7 @@
 #   -DDISABLE_FFI      build without ffi.h (disables ThreadCall)
 #   -DDISABLE_OPENGL   build without OpenGL headers (disables OpenGL gfx drivers)
 #   -DDISABLE_FBDEV    build without Linux framebuffer device headers (disables Linux fbdev gfx driver)
+#   -DDISABLE_D3D10    build without DirectX 10 driver(disable D2D driver in windows)
 #   -DDISABLE_NCURSES  build without libtinfo or ncurses (disables console commands)
 #   -DDISABLE_LANGINFO build without locale info (affects Unix only; makes no difference unless you
 #                      call setlocale() manually). Does not remove setlocale(LC_CTYPE, "") call.
@@ -194,6 +195,12 @@ ifdef TARGET
     else ifneq ($(filter xbox%,$(triplet)),)
       TARGET_OS := xbox
     endif
+    ifneq ($(filter emscripten%,$(triplet)),)
+      TARGET_OS := js
+	  AS = llvm-as
+	  AR = emar
+	  CC = emcc
+    endif
   endif
 
   ifndef TARGET_ARCH
@@ -246,7 +253,16 @@ else
     # msys64  mingw32  MINGW32_NT-6.1 x86_64    i686-w64-mingw32
     # msys64  mingw64  MINGW64_NT-6.1 x86_64    x86_64-w64-mingw32
     #
+    # on WinXP...
+    # host    shell    uname -s -m              default gcc target
+    # ------  -------  --------------------     ------------------
+    # mingw   cmd.exe  MINGW32_NT-5.1 i686      mingw32
+    #
     else ifneq ($(findstring MINGW32,$(uname)),)
+      # host is WinXP, then don't include DirectX 10 driver
+      ifneq ($(findstring NT-5,$(uname)),)
+        DISABLE_D3D10 := 1
+      endif
       TARGET_ARCH := x86
     else ifneq ($(findstring MINGW64,$(uname)),)
       TARGET_ARCH := x86_64
@@ -464,6 +480,10 @@ ifneq ($(filter cygwin win32,$(TARGET_OS)),)
   ALLFBLFLAGS += -t 2048
 endif
 
+ifeq ($(TARGET_OS),js)
+	DISABLE_MT := YesPlease
+endif
+
 # Pass the configuration defines on to the compiler source code
 ifdef ENABLE_STANDALONE
   ALLFBCFLAGS += -d ENABLE_STANDALONE
@@ -552,6 +572,11 @@ endif
 ifeq ($(TARGET_OS),dos)
   RTL_LIBS += $(libdir)/libc.a
 endif
+ifeq ($(TARGET_OS),js)
+  RTL_LIBS += $(libdir)/termlib_min.js
+  RTL_LIBS += $(libdir)/fb_rtlib.js
+  RTL_LIBS += $(libdir)/fb_shell.html
+endif
 
 #
 # Build rules
@@ -620,6 +645,16 @@ $(libdir)/fbrt0pic.o: $(srcdir)/rtlib/static/fbrt0.c $(LIBFB_H) | $(libdir)
 	$(QUIET_CC)$(CC) -fPIC $(ALLCFLAGS) -c $< -o $@
 
 $(libdir)/libfb.a: $(LIBFB_C) $(LIBFB_S) | $(libdir)
+$(libdir)/termlib_min.js: $(rootdir)lib/termlib_min.js
+	cp $< $@
+
+$(libdir)/fb_rtlib.js: $(rootdir)lib/fb_rtlib.js
+	cp $< $@
+	
+$(libdir)/fb_shell.html: $(rootdir)lib/fb_shell.html
+	cp $< $@
+	
+$(libdir)/libfb.a: $(LIBFB_C) $(LIBFB_S)
 ifeq ($(TARGET_OS),dos)
   # Avoid hitting the command line length limit (the libfb.a ar command line
   # is very long...)
@@ -1114,6 +1149,8 @@ bootstrap-dist:
 	mkdir -p bootstrap/linux-x86_64
 	mkdir -p bootstrap/win32
 	mkdir -p bootstrap/win64
+	mkdir -p bootstrap/linux-arm
+	mkdir -p bootstrap/linux-aarch64
 	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target dos            && mv src/compiler/*.asm bootstrap/dos
 	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target freebsd-x86    && mv src/compiler/*.asm bootstrap/freebsd-x86
 	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target freebsd-x86_64 && mv src/compiler/*.c   bootstrap/freebsd-x86_64
@@ -1121,6 +1158,8 @@ bootstrap-dist:
 	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target linux-x86_64   && mv src/compiler/*.c   bootstrap/linux-x86_64
 	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target win32          && mv src/compiler/*.asm bootstrap/win32
 	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target win64          && mv src/compiler/*.c   bootstrap/win64
+	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target linux-arm      && mv src/compiler/*.c   bootstrap/linux-arm
+	./$(FBC_EXE) src/compiler/*.bas -m fbc -i inc -e -r -v -target linux-aarch64  && mv src/compiler/*.c   bootstrap/linux-aarch64
 
 	# Ensure to have LFs regardless of host system (LFs will probably work
 	# on DOS/Win32, but CRLFs could cause issues on Linux)
@@ -1131,6 +1170,8 @@ bootstrap-dist:
 	dos2unix bootstrap/linux-x86_64/*
 	dos2unix bootstrap/win32/*
 	dos2unix bootstrap/win64/*
+	dos2unix bootstrap/linux-arm/*
+	dos2unix bootstrap/linux-aarch64/*
 
 	# Package FB sources (similar to our "gitdist" command), and add the bootstrap/ directory
 	# Making a .tar.xz should be good enough for now.

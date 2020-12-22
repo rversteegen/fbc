@@ -65,6 +65,7 @@ dim shared fbcu_suite_index as integer = INVALID_INDEX
 dim shared fbcu_test_index as integer = INVALID_INDEX
 
 dim shared fbcu_hide_cases as boolean = false
+dim shared fbcu_show_console as boolean = false
 dim shared fbcu_brief_summary as boolean = false
 
 '' --------------------
@@ -554,6 +555,31 @@ namespace fbcu
 	end function
 
 	''
+	sub setShowConsole _
+		( _
+			byval showConsole as boolean _
+		)
+		fbcu_show_console = showConsole
+	end sub
+
+	''
+	function getShowConsole _
+		( _
+		) as boolean
+		function = fbcu_show_console
+	end function
+
+	''
+	sub outputConsoleString _
+		( _
+			byref s as const string = "" _
+		)
+		if( fbcu_show_console ) then
+			print_output( s )
+		end if
+	end sub
+
+	''
 	function run_tests _
 		( _
 			byval show_summary as boolean = true, _
@@ -589,17 +615,12 @@ namespace fbcu
 				.assert_fail_count = 0
 
 				if( .init_proc ) then
-					if( .init_proc() ) then
+					'' init proc should return 0 on success
+					if( .init_proc() = 0 ) then
 						dotests = true
 					else
-#if true
-						'' !!! fbc compiler test suite hack
-						'' current test suite does not set return value for init procs
-						dotests = true
-#else
 						print_output( "      " & .name & " init procedure failed" )
 						failed = true
-#endif
 					end if
 				else
 					dotests = true
@@ -644,13 +665,10 @@ namespace fbcu
 				end if
 
 				if( .term_proc ) then
-					if( .term_proc() = false ) then
-#if false
-						'' !!! fbc compiler test suite hack
-						'' current test suite does not set return value for cleanup procs
+					'' exit proc should return non-zero on failure
+					if( .term_proc() <> 0 ) then
 						print_output( "      " & .name & " cleanup procedure failed" )
 						failed = true
-#endif
 					end if
 				end if
 

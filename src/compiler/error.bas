@@ -85,7 +85,8 @@ declare function hMakeParamDesc _
 		( /'FB_WARNINGMSG_CONSTQUALIFIERDISCARDED   '/ 0, @"CONST qualifier discarded" ), _
 		( /'FB_WARNINGMSG_RETURNTYPEMISMATCH        '/ 0, @"Return type mismatch" ), _
 		( /'FB_WARNINGMSG_CALLINGCONVMISMATCH       '/ 0, @"Calling convention mismatch" ), _
-		( /'FB_WARNINGMSG_ARGCNTMISMATCH            '/ 0, @"Argument count mismatch" ) _
+		( /'FB_WARNINGMSG_ARGCNTMISMATCH            '/ 0, @"Argument count mismatch" ), _
+		( /'FB_WARNINGMSG_SUFFIXIGNORED             '/ 1, @"Suffix ignored" ) _
 	}
 
 	dim shared errorMsgs( 1 to FB_ERRMSGS-1 ) as const zstring ptr => _
@@ -172,7 +173,7 @@ declare function hMakeParamDesc _
 		 /'FB_ERRMSG_MACROTEXTTOOLONG                   '/ @"Macro text too long", _
 		 /'FB_ERRMSG_INVALIDCMDOPTION                   '/ @"Invalid command-line option", _
 		 /'FB_ERRMSG_DOSWITHNONX86                      '/ @"Selected non-x86 CPU when compiling for DOS", _
-		 /'FB_ERRMSG_GENGASWITHNONX86                   '/ @"Selected -gen gas ASM backend for non-x86 CPU", _
+		 /'FB_ERRMSG_GENGASWITHNONX86                   '/ @"Selected -gen gas|gas64 ASM backend is incompatible with CPU", _
 		 /'FB_ERRMSG_GENGASWITHOUTINTEL                 '/ @"-asm att used for -gen gas, but -gen gas only supports -asm intel", _
 		 /'FB_ERRMSG_GENGASWITHPIC                      '/ @"-pic is not supported with -gen gas", _
 		 /'FB_ERRMSG_PICNOTSUPPORTEDFORTARGET           '/ @"-pic used, but not supported by target system (only works for Unixes)", _
@@ -496,8 +497,8 @@ private sub hPrintErrMsg _
 		byval customText as const zstring ptr = 0 _
 	) static
 
-    dim as const zstring ptr msg
-    dim as string token_pos
+	dim as const zstring ptr msg
+	dim as string token_pos
 
 	if( (errnum < 1) or (errnum >= FB_ERRMSGS) ) then
 		msg = NULL
@@ -761,13 +762,11 @@ sub errReportWarn _
 
 end sub
 
-'':::::
-sub errReportNotAllowed _
+private function getNotAllowedMsg _
 	( _
 		byval opt as FB_LANG_OPT, _
-		byval errnum as integer, _
-		byval msgex as zstring ptr _
-	)
+		byval msgex as zstring ptr = NULL _
+	) as string
 
 	dim as string msg = ""
 	dim as integer i, langs
@@ -784,6 +783,20 @@ sub errReportNotAllowed _
 	next
 
 	msg += *hAddToken( FALSE, langs > 0, msgex )
+
+	return msg
+
+end function
+
+'':::::
+sub errReportNotAllowed _
+	( _
+		byval opt as FB_LANG_OPT, _
+		byval errnum as integer, _
+		byval msgex as zstring ptr _
+	)
+
+	dim msg as string = getNotAllowedMsg( opt, msgex )
 
 	errReportEx( errnum, msg, , FB_ERRMSGOPT_NONE )
 
@@ -834,7 +847,7 @@ private function hMakeParamDesc _
 			end if
 		end if
 
-    	if( pid <> NULL ) then
+		if( pid <> NULL ) then
 			if( len(*pid) > 0 ) then
 				desc += " ("
 				desc += *pid
@@ -866,9 +879,9 @@ private function hMakeParamDesc _
 				s = symbProcPtrToStr( proc )
 				pname = strptr( s )
 			'' method?
-			elseif( (symbGetAttrib( proc ) and (FB_SYMBATTRIB_CONSTRUCTOR or _
-											    FB_SYMBATTRIB_DESTRUCTOR or _
-											    FB_SYMBATTRIB_OPERATOR)) <> 0 ) then
+			elseif( (proc->pattrib and (FB_PROCATTRIB_CONSTRUCTOR or _
+							FB_PROCATTRIB_DESTRUCTOR or _
+							FB_PROCATTRIB_OPERATOR)) <> 0 ) then
 				s = symbMethodToStr( proc )
 				pname = strptr( s )
 			end if
