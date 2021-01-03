@@ -1604,7 +1604,7 @@ function symbGetValistType _
 	'' if gcc's builtin va_list is a pointer type, then it must
 	'' have the mangle modifer on the dtype to get recognized.
 	''
-	'' if it's just an ANY PTR with out any mangle modifer
+	'' if it's just an ANY PTR without any mangle modifer
 	'' then it might be used for va_list on the target, 
 	'' but we don't know, and it doesn't matter anyway
 	'' so just return FB_CVA_LIST_NONE
@@ -1612,7 +1612,8 @@ function symbGetValistType _
 	'' for va_list structure type, we might be looking at a dtype
 	'' with a UDT subtype, or we might be looking at the UDT
 	'' itself.  Either way, we must look at the UDT itself to
-	'' determine if it is a struct or struct array type using
+	'' determine if it is a struct, a struct array type 
+	'' or std::va_list type using
 	''   - symbGetUdtValistType()
 
 	'' Determine the following:
@@ -1713,9 +1714,12 @@ function symbTypeToStr _
 	case FB_DATATYPE_FUNCTION
 		'' Procedure pointer
 
-		'' The sub() or function() already implies one PTR
-		assert( ptrcount > 0 )
-		ptrcount -= 1
+		'' The sub() or function() already implies one PTR, unless
+		'' we are dumping this from AST in which case the SYM could
+		'' refer the the procedure type itself with no pointer.
+		if( ptrcount > 0 ) then
+			ptrcount -= 1
+		end if
 
 		'' If there are any more PTRs, i.e. a PTR to a proc PTR,
 		'' then it must be emitted inside a typeof():

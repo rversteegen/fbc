@@ -2582,6 +2582,10 @@ private sub hParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 		fbSetOption( FB_COMPOPT_ASMSYNTAX, fbc.asmsyntax )
 	end if
 
+	'' Update the stacksize for the current target options if
+	'' stacksize was never set yet by passing a negative stacksize
+	fbSetOption( FB_COMPOPT_STACKSIZE, -1 )
+
 	'' TODO: Check whether subsystem/stacksize/xboxtitle were set and
 	'' complain about it when the target doesn't allow it, or just
 	'' ignore silently (that might not even be too bad for portability)?

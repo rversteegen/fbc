@@ -32,7 +32,7 @@ Return the thread handle of the current thread.
 Dim As Any Ptr phandle(1 To 10)
 
 Sub myThread (Byval p As Any Ptr)
-	Print "Thread id: " & Threadself()
+	Print "Thread handle: " & Threadself()
 End Sub
 
 For I As Integer = 1 To 10
@@ -50,34 +50,30 @@ Sleep
 #include "fbthread.bi"
 
 Dim As Any Ptr phandle(1 To 10)
-Dim Shared As Any Ptr pmutex0
 Dim Shared As Any Ptr pmutex
 
-Sub myThread (Byval p As Any Ptr)
-	Mutexlock(pmutex0)  ' to ensure that ThreadCreate line is completed before accessing the handle value
-	Dim As Any Ptr phandle1 = *Cptr(Any Ptr Ptr, p)
-	Mutexunlock(pmutex0)
+Sub myThread (ByVal p As Any Ptr)
+	MutexLock(pmutex)  ' to ensure that ThreadCreate line is completed before accessing the handle value
+	Dim As Any Ptr phandle1 = *CPtr(Any Ptr Ptr, p)
+	MutexUnlock(pmutex)
 	Dim As Any Ptr phandle2 = Threadself()
-	Mutexlock(pmutex)
-	Print "   ThreadCreate: " & phandle1, "ThreadSelf: " & phandle2
-	Mutexunlock(pmutex)
+	Print Left("   ThreadCreate: " & phandle1 & Space(18), 36) _
+		  & "   ThreadSelf: " & phandle2  ' single print with concatenated string avoids using a mutex
 	Sleep 100, 1
 End Sub
 
 Print "Handles returned from:"
-pmutex0 = Mutexcreate()
-pmutex = Mutexcreate()
+pmutex = MutexCreate()
 For I As Integer = 1 To 10
-	Mutexlock(pmutex0)  ' to ensure that ThreadCreate line is completed before thread accesses the handle value
-	phandle(I) = Threadcreate(@myThread, @phandle(I))
-	Mutexunlock(pmutex0)
+	MutexLock(pmutex)  ' to ensure that ThreadCreate line is completed before thread accesses the handle value
+	phandle(I) = ThreadCreate(@myThread, @phandle(I))
+	MutexUnlock(pmutex)
 Next I
 
 For I As Integer = 1 To 10
-	Threadwait(phandle(I))
+	ThreadWait(phandle(I))
 Next I
-Mutexdestroy(pmutex0)
-Mutexdestroy(pmutex)
+MutexDestroy(pmutex)
 
 Sleep
 	%%
@@ -119,9 +115,7 @@ Type threadData
 	Dim As String prefix
 	Dim As String suffix
 	Dim As Double tempo
-	Static As Any Ptr mutex
 End Type
-Dim As Any Ptr threadData.mutex
 
 Function counter() As Integer  ' definition of a generic counter with counting depending on thread calling it
 	TLSinteger() += 1
@@ -133,12 +127,7 @@ Sub Thread(ByVal p As Any Ptr)
 	Dim As UInteger c
 	Do
 		c = counter()
-		MutexLock(threadData.mutex)
-		Print ptd->prefix;
-		Print c;
-		Print ptd->suffix;
-		Print " ";
-		MutexUnlock(threadData.mutex)
+		Print ptd->prefix & c & ptd->suffix & " ";  ' single print with concatenated string avoids using a mutex
 		Sleep ptd->tempo, 1
 	Loop Until c = 12
 End Sub
@@ -149,8 +138,6 @@ Print "|x| : counting from thread a"
 Print "(x) : counting from thread b"
 Print "[x] : counting from thread c"
 Print
-
-threadData.mutex = MutexCreate()
 
 Dim As threadData mtlsa
 mtlsa.prefix = "|"
@@ -173,14 +160,12 @@ mtlsc.handle = ThreadCreate(@Thread, @mtlsc)
 ThreadWait(mtlsa.handle)
 ThreadWait(mtlsb.handle)
 ThreadWait(mtlsc.handle)
-MutexDestroy(threadData.mutex)
 
 Print
 Print
 Print "end of threads"
 
-Sleep
-	%%
+Sleep	%%
 {{fbdoc item="lang"}}
 	- Threading is not allowed in the //[[CompilerOptlang|-lang qb]]// dialect.
 

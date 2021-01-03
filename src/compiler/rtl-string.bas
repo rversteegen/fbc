@@ -2165,7 +2165,7 @@ function rtlStrConcat _
 	if( astNewARG( proc, _
 		astNewLINK( astBuildTempVarClear( tmp ), _
 			astNewVAR( tmp ), _
-			FALSE ) ) = NULL ) then
+			AST_LINK_RETURN_RIGHT ) ) = NULL ) then
 		exit function
 	end if
 
@@ -2554,7 +2554,10 @@ function rtlStrAssign _
 		exit function
 	end if
 
-	''
+	'' always discard result, even though actual rtlib returns a ptr to destination
+	'' it will never be used anywhere
+	astSetType( proc, FB_DATATYPE_VOID, NULL )
+
 	function = proc
 
 end function

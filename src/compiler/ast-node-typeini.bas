@@ -385,22 +385,22 @@ private function hCallCtorList _
 		label = symbAddLabel( NULL )
 		iter = symbAddTempVar( typeAddrOf( n->dtype ), n->subtype )
 
-		t = astNewLINK( t, astBuildVarAssign( iter, astNewADDROF( fldexpr ), AST_OPOPT_ISINI ) )
+		t = astNewLINK( t, astBuildVarAssign( iter, astNewADDROF( fldexpr ), AST_OPOPT_ISINI ), AST_LINK_RETURN_NONE )
 
 		'' for cnt = 0 to elements-1
 		t = astBuildForBegin( t, cnt, label, 0 )
 
 		'' ctor( *iter )
-		t = astNewLINK( t, astBuildCtorCall( n->subtype, astBuildVarDeref( iter ) ) )
+		t = astNewLINK( t, astBuildCtorCall( n->subtype, astBuildVarDeref( iter ) ), AST_LINK_RETURN_NONE )
 
 		'' iter += 1
-		t = astNewLINK( t, astBuildVarInc( iter, 1 ) )
+		t = astNewLINK( t, astBuildVarInc( iter, 1 ), AST_LINK_RETURN_NONE )
 
 		'' next
 		t = astBuildForEnd( t, cnt, label, astNewCONSTi( n->typeini.elements ) )
 	else
 		'' ctor( this )
-		t = astNewLINK( t, astBuildCtorCall( n->subtype, fldexpr ) )
+		t = astNewLINK( t, astBuildCtorCall( n->subtype, fldexpr ), AST_LINK_RETURN_NONE )
 	end if
 
 	function = t
@@ -457,7 +457,7 @@ function astTypeIniFlush overload _
 						if( n->sym->var_.bitpos = 0 ) then
 							l = astBuildDerefAddrOf( astCloneTree( target ), n->typeini.ofs, n->dtype, n->subtype )
 							l = astNewMEM( AST_OP_MEMCLEAR, l, astNewCONSTi( typeGetSize( symbGetFullType( n->sym ) ) ) )
-							t = astNewLINK( t, l )
+							t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
 						end if
 					end if
 				end if
@@ -467,13 +467,13 @@ function astTypeIniFlush overload _
 
 			l = astNewASSIGN( l, n->l, assignoptions or AST_OPOPT_DONTCHKPTR )
 			assert( l )
-			t = astNewLINK( t, l )
+			t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
 
 		'' Clear the given amount of bytes at the given offset in the target
 		case AST_NODECLASS_TYPEINI_PAD
 			l = astBuildDerefAddrOf( astCloneTree( target ), n->typeini.ofs, n->dtype, n->subtype )
 			l = astNewMEM( AST_OP_MEMCLEAR, l, astNewCONSTi( n->typeini.bytes ) )
-			t = astNewLINK( t, l )
+			t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
 
 		'' Use the given CALL (and its ARGs) as-is, but insert the byref instance argument,
 		'' pointing to the given offset in the target
@@ -481,7 +481,7 @@ function astTypeIniFlush overload _
 			l = astBuildDerefAddrOf( astCloneTree( target ), n->typeini.ofs, n->dtype, n->subtype, n->sym )
 
 			l = astPatchCtorCall( n->l, l )
-			t = astNewLINK( t, l )
+			t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
 
 		'' Build constructor calls for an array of elements
 		case AST_NODECLASS_TYPEINI_CTORLIST
@@ -544,22 +544,40 @@ private sub hFlushExprStatic( byval n as ASTNODE ptr, byval basesym as FBSYMBOL 
 
 	'' not a literal string?
 	if( litsym = NULL ) then
-    	'' offset?
+		'' offset?
 		if( astIsOFFSET( expr ) ) then
 			irEmitVARINIOFS( sym, astGetSymbol( expr ), expr->ofs.ofs )
+
 		'' anything else
 		else
-			'' different types?
-			if( edtype <> sdtype ) then
-				expr = astNewCONV( sfulldtype, symbGetSubtype( sym ), expr, AST_CONVOPT_DONTCHKPTR )
-				assert( expr <> NULL )
-			end if
+			'' Explicit cast of an address?  We can discard the cast if it's an offset.
+			scope
+					var lexpr = expr->l
+				while( lexpr )
+					if( astIsOFFSET( lexpr ) ) then
+						irEmitVARINIOFS( sym, astGetSymbol( lexpr ), lexpr->ofs.ofs )
+						expr = NULL
+						exit while
+					end if
+					lexpr = lexpr->l
+				wend
+			end scope
 
-			assert( astIsCONST( expr ) )
-			if( typeGetClass( sdtype ) = FB_DATACLASS_FPOINT ) then
-				irEmitVARINIf( sym, astConstGetFloat( expr ) )
-			else
-				irEmitVARINIi( sym, astConstGetInt( expr ) )
+			if( expr ) then
+				'' must be a constant
+				assert( astIsCONST( expr ) )
+
+				'' different types? and there was no explicit cast?
+				if( edtype <> sdtype ) then
+					expr = astNewCONV( sfulldtype, symbGetSubtype( sym ), expr, AST_CONVOPT_DONTCHKPTR )
+					assert( expr <> NULL )
+				end if
+
+				if( typeGetClass( sdtype ) = FB_DATACLASS_FPOINT ) then
+					irEmitVARINIf( sym, astConstGetFloat( expr ) )
+				else
+					irEmitVARINIi( sym, astConstGetInt( expr ) )
+				end if
 			end if
 		end if
 	'' literal string..
@@ -646,18 +664,38 @@ private function hExprIsConst( byval n as ASTNODE ptr ) as integer
 		end if
 	end if
 
-	var rexpr = n->l
+	var expr = n->l
 
-	'' Expression must be constant or address-of global to be usable in global initializer
-	select case( rexpr->class )
+	'' Expression must be:
+	'' - constant, or 
+	'' - address-of global, or
+	'' - conversion of address of global
+	'' to be usable in global initializer.
+	'' we should not need to worry about conversions / castings of contants
+	'' because they should have been constant folded by now.
+
+	select case( expr->class )
 	case AST_NODECLASS_OFFSET, AST_NODECLASS_CONST
 		return TRUE
+	case AST_NODECLASS_CONV
+		'' allow conversion of OFFSET's
+		while( expr )
+			select case( expr->class )
+			case AST_NODECLASS_CONV
+			case AST_NODECLASS_OFFSET
+				return TRUE
+			case else
+				exit while
+			end select
+			expr = expr->l
+		wend
+		return FALSE
 	end select
 
 	'' Or a string literal, for a global string.
-	select case( astGetDataType( rexpr ) )
+	select case( astGetDataType( expr ) )
 	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
-		if( astGetStrLitSymbol( rexpr ) ) then
+		if( astGetStrLitSymbol( expr ) ) then
 			return TRUE
 		end if
 	end select
@@ -779,7 +817,7 @@ private function hWalk _
 	end if
 
 	'' walk
-	return astNewLINK( hWalk( n->l, n ), hWalk( n->r, n ) )
+	return astNewLINK( hWalk( n->l, n ), hWalk( n->r, n ), AST_LINK_RETURN_NONE )
 end function
 
 #if __FB_DEBUG__
@@ -831,7 +869,7 @@ function astTypeIniUpdate( byval tree as ASTNODE ptr ) as ASTNODE ptr
 	'' be executed before the tree which accesses that temp var. The LINK
 	'' as a whole should still return the result of the tree though, so that
 	'' astTypeIniUpdate() can be used in the middle of an expression.
-	function = astNewLINK( tempvarinitcode, treeparent.l, FALSE )
+	function = astNewLINK( tempvarinitcode, treeparent.l, AST_LINK_RETURN_RIGHT )
 end function
 
 '' Duplicates a TYPEINI initializer into the current context. The cloned TYPEINI

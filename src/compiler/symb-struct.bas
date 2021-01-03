@@ -637,25 +637,34 @@ sub symbInsertInnerUDT _
 	end if
 
 end sub
+
 ''================================================
-'' for Linux structure parameters size<=16
+'' for Linux structure parameters size<=16 bytes
 ''================================================
-sub struct_analyze(byval fld as FBSYMBOL ptr,byref part1 as integer,byref part2 as integer,byref limit as integer)
+'' if the structure size is less or equal to 16 bytes it could be passed directly in registers according the datatype fields
+'' integers and floats could even be mixed using Rxx and Xmm
+'' analyzing the 8 low bytes then the 8 high bytes to know if each block contains integer or/and float
+'' if at least one integer field all the range is considered as integer
+'' if the size is greater than 8 and the result is only KPART1FLOAT or KPART1INTEGER then the structure is totally float or totally integer
+'' (the structure contains only an array of simple datatype) and the result is forced to KSTRUCT_XX or KSTRUCT_RR
+''================================================
+private sub struct_analyze( byval fld as FBSYMBOL ptr, byref part1 as integer, byref part2 as integer, byref range as integer )
+	
 	dim as integer lgt=fld->lgt
 	fld = symbUdtGetFirstField(fld)
 	while fld
-		if limit=7 and fld->ofs>7 then
-			limit+=8
-			part2=8
+		if range=KLOW8BYTES and fld->ofs>7 then
+			range = KHIGH8BYTES
+			part2 = KPART2FLOAT ''default
 		end if
 
 		if typegetclass(fld->typ)=FB_DATACLASS_UDT then
-			struct_analyze(fld->subtype,part1,part2,limit)
+			struct_analyze(fld->subtype,part1,part2,range)
 		elseif typegetclass(fld->typ)=FB_DATACLASS_INTEGER then
-			if limit=7 then
-				part1=1
+			if range=KLOW8BYTES then
+				part1=KPART1INTEGER
 			else
-				part2=4
+				part2=KPART2INTEGER
 			end if
 		end if
 		fld=symbUdtGetNextField(fld)
@@ -663,50 +672,52 @@ sub struct_analyze(byval fld as FBSYMBOL ptr,byref part1 as integer,byref part2 
 
 	if lgt>8 then
 		''case array in type eg type udt / array(0 to 1) as integer /end type
-		if part1+part2=1 then
-			part1=5
-		elseif part1+part2=2 then
-			part1=10
+		if part1+part2=KPART1INTEGER then
+			part1=KSTRUCT_RR
+		elseif part1+part2=KPART1FLOAT then
+			part1=KSTRUCT_XX
 		end if
 	end if
 
 end sub
+function hGetMagicStructNumber( byval sym as FBSYMBOL ptr ) as integer
+	'' by default floating point for first register
+	dim as integer part1 = KPART1FLOAT
+	dim as integer part2 = KPARTNOTDEF
+	dim as integer range = KLOW8BYTES
+
+	struct_analyze( sym, part1, part2, range )
+
+	return part1 + part2
+end function
 
 private function hGetReturnTypeGas64Linux( byval sym as FBSYMBOL ptr ) as integer
 
 	assert( env.clopt.backend = FB_BACKEND_GAS64 )
 	assert( env.clopt.target = FB_COMPTARGET_LINUX )
 
-	''Linux gas64 could use 2 registers	
+	'' Linux gas64 could use 2 registers	
 
 	if( sym->lgt <= typeGetSize( FB_DATATYPE_LONGINT ) * 2 ) then
-
-		''by default floating point for first register
-		dim as integer part1 = 2
-		dim as integer part2 = 0
-		dim as integer limit = 7
-
-		struct_analyze( sym, part1, part2, limit )
-
-		select case as const part1+part2
-			case 1 ''only integers in RAX
+		select case as const hGetMagicStructNumber( sym )
+			case KSTRUCT_R ''only integers in RAX
 				'' don't set retin2regs, it's handled by datatype only 
 				'' sym->udt.retin2regs = FB_STRUCT_R
 				return FB_DATATYPE_LONGINT
-			case 2 ''only floats in XMM0
+			case KSTRUCT_X ''only floats in XMM0
 				'' don't set retin2regs, it's handled by datatype only
 				'' sym->udt.retin2regs = FB_STRUCT_X
 				return FB_DATATYPE_DOUBLE
-			case 5 ''only integers in RAX/RDX
+			case KSTRUCT_RR ''only integers in RAX/RDX
 				sym->udt.retin2regs = FB_STRUCT_RR
 				return FB_DATATYPE_STRUCT
-			case 9 ''first part in RAX then in XMMO
+			case KSTRUCT_RX ''first part in RAX then in XMMO
 				 sym->udt.retin2regs = FB_STRUCT_RX
 				 return FB_DATATYPE_STRUCT
-			case 6 ''first part in XMMO then in RAX
+			case KSTRUCT_XR ''first part in XMMO then in RAX
 				sym->udt.retin2regs = FB_STRUCT_XR
 				return typeAddrOf( FB_DATATYPE_STRUCT )
-			case 10 ''only floats in XMM0/XMM1
+			case KSTRUCT_XX ''only floats in XMM0/XMM1
 				sym->udt.retin2regs = FB_STRUCT_XX
 				return FB_DATATYPE_STRUCT
 			case else

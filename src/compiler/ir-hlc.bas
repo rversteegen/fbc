@@ -2270,7 +2270,8 @@ private function hUopToStr _
 	case else
 		is_builtin = TRUE
 
-		if( dtype = FB_DATATYPE_SINGLE ) then
+		'' ignore any const qualifier
+		if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then
 			select case as const( op )
 			case AST_OP_SIN   : function = @"__builtin_sinf"
 			case AST_OP_ASIN  : function = @"__builtin_asinf"
@@ -2285,7 +2286,7 @@ private function hUopToStr _
 			case else          : assert( FALSE )
 			end select
 		else
-			assert( dtype = FB_DATATYPE_DOUBLE )
+			assert( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_DOUBLE )
 			select case as const( op )
 			case AST_OP_SIN   : function = @"__builtin_sin"
 			case AST_OP_ASIN  : function = @"__builtin_asin"
