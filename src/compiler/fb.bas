@@ -230,11 +230,13 @@ end type
 
 dim shared as FBCPUFAMILYINFO cpufamilyinfo(0 to FB_CPUFAMILY__COUNT-1) = _
 { _
-	(@"x86"    , FB_DEFAULT_CPUTYPE_X86    ), _
-	(@"x86_64" , FB_DEFAULT_CPUTYPE_X86_64 ), _
-	(@"arm"    , FB_DEFAULT_CPUTYPE_ARM    ), _
-	(@"aarch64", FB_DEFAULT_CPUTYPE_AARCH64), _
-	(@"asmjs"  , FB_DEFAULT_CPUTYPE_ASMJS  )  _
+	(@"x86"    ,   FB_DEFAULT_CPUTYPE_X86    ), _
+	(@"x86_64" ,   FB_DEFAULT_CPUTYPE_X86_64 ), _
+	(@"arm"    ,   FB_DEFAULT_CPUTYPE_ARM    ), _
+	(@"aarch64",   FB_DEFAULT_CPUTYPE_AARCH64), _
+	(@"powerpc",   FB_DEFAULT_CPUTYPE_PPC    ), _
+	(@"powerpc64", FB_DEFAULT_CPUTYPE_PPC64  ), _
+	(@"asmjs"  ,   FB_DEFAULT_CPUTYPE_ASMJS  )  _
 }
 
 type FBCPUTYPEINFO

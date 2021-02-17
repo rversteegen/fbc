@@ -830,6 +830,8 @@ sub symbDefineInit _
 	select case( fbGetCpuFamily( ) )
 	case FB_CPUFAMILY_ARM, FB_CPUFAMILY_AARCH64
 		symbAddDefine( @"__FB_ARM__", NULL, 0 )
+	case FB_CPUFAMILY_PPC, FB_CPUFAMILY_PPC64
+		symbAddDefine( @"__FB_PPC__", NULL, 0 )
 	case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
 		symbAddDefine( @"__FB_X86__", NULL, 0 )
 		symbAddDefine( @"__FB_ASM__", NULL, 0, FALSE, @hDefAsm_cb, FB_DEFINE_FLAGS_STR )
